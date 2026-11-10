@@ -17,6 +17,7 @@ class Areas extends BaseConfig
         'mentors'     => ['name' => 'Mentors',       'desc' => 'Mentor assignments (mentors are volunteers with a mentor role).'],
         'volunteers'  => ['name' => 'Volunteers',    'desc' => 'All adults who serve: contact details, roles, compliance.'],
         'groups'      => ['name' => 'Groups',        'desc' => 'Team, Friday night, life skills and accountability groupings.'],
+        'schedule'    => ['name' => 'Schedule',      'desc' => 'Course catalog, instructors and the weekly / yearly class map.'],
         'transcripts' => ['name' => 'Transcripts',   'desc' => 'Course catalog, grades and transcript PDFs.'],
         'applicants'  => ['name' => 'Applicants',    'desc' => 'Admissions pipeline and interview scores (future).'],
         'admin'       => ['name' => 'Site Admin',    'desc' => 'Manage who can log in, program years and settings.'],

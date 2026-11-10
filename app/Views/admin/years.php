@@ -14,6 +14,7 @@
   <div class="col-md-2"><label class="form-label">Year #</label><input class="form-control" name="year_number" type="number"></div>
   <div class="col-md-3"><label class="form-label">Start</label><input class="form-control" name="start_date" type="date"></div>
   <div class="col-md-3"><label class="form-label">End</label><input class="form-control" name="end_date" type="date"></div>
+  <div class="col-md-4"><label class="form-label">GAP week 1 starts (Monday)</label><input class="form-control" name="week_one_starts" type="date"></div>
   <div class="col-md-4"><label class="form-label">Moodle overall-standing course id</label><input class="form-control" name="moodle_overall_course_id" type="number"></div>
   <div class="col-md-8"><label class="form-label">Program description (transcript)</label><input class="form-control" name="program_description"></div>
   <div class="col-md-3"><label class="form-label">Tuition early</label><input class="form-control" name="tuition_year_early"></div>
@@ -23,5 +24,5 @@
   <div class="col-12"><label class="form-label">Transcript note ("Also completed…")</label><textarea class="form-control" name="transcript_notes" rows="2"></textarea></div>
   <div class="col-12"><label class="form-label">Grade scale (JSON)</label><textarea class="form-control font-monospace small" name="grade_scale" rows="2"></textarea></div>
  </div><div class="modal-footer"><button class="btn btn-dark">Save</button></div></form></div></div>
-<script>function editY(y){const f=document.getElementById('yForm');for(const k of ['id','label','year_number','start_date','end_date','moodle_overall_course_id','program_description','tuition_year_early','tuition_year_late','tuition_cutoff_date','transcript_notes','grade_scale'])f.elements[k].value=y?(y[k]??''):'';f.elements['is_current'].checked=!!(y&&+y.is_current);}</script>
+<script>function editY(y){const f=document.getElementById('yForm');for(const k of ['id','label','year_number','start_date','end_date','week_one_starts','moodle_overall_course_id','program_description','tuition_year_early','tuition_year_late','tuition_cutoff_date','transcript_notes','grade_scale'])f.elements[k].value=y?(y[k]??''):'';f.elements['is_current'].checked=!!(y&&+y.is_current);}</script>
 <?= $this->endSection() ?>

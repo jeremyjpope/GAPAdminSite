@@ -84,6 +84,48 @@ $routes->group('groups', ['filter' => 'area:groups'], static function ($r) {
     $r->get('sets/(:num)/print', 'Groups::printSet/$1');
 });
 
+$routes->group('courses', ['filter' => 'area:schedule'], static function ($r) {
+    $r->get('/', 'Courses::index');
+    $r->get('new', 'Courses::create');
+    $r->post('/', 'Courses::store');
+    $r->get('(:num)', 'Courses::show/$1');
+    $r->get('(:num)/edit', 'Courses::edit/$1');
+    $r->post('(:num)', 'Courses::update/$1');
+    $r->post('(:num)/delete', 'Courses::delete/$1');
+    $r->post('(:num)/merge', 'Courses::merge/$1');
+    $r->post('(:num)/staff', 'Courses::addStaff/$1');
+    $r->post('(:num)/staff/(:num)/remove', 'Courses::removeStaff/$1/$2');
+    $r->post('(:num)/assets', 'Courses::addAsset/$1');
+    $r->post('(:num)/assets/(:num)/remove', 'Courses::removeAsset/$1/$2');
+    $r->get('(:num)/assets/(:num)', 'Courses::asset/$1/$2');
+});
+
+$routes->group('schedule', ['filter' => 'area:schedule'], static function ($r) {
+    $r->get('/', 'Schedule::week');
+    $r->get('week', 'Schedule::week');
+    $r->get('year', 'Schedule::year');
+    $r->get('grid', 'Schedule::grid');
+    $r->get('hours', 'Schedule::hours');
+    $r->get('staff', 'Schedule::staff');
+    $r->get('entries/new', 'Schedule::create');
+    $r->post('entries', 'Schedule::store');
+    $r->get('entries/(:num)', 'Schedule::edit/$1');
+    $r->post('entries/(:num)', 'Schedule::update/$1');
+    $r->post('entries/(:num)/delete', 'Schedule::delete/$1');
+    $r->post('entries/(:num)/staff', 'Schedule::addStaff/$1');
+    $r->post('entries/(:num)/staff/(:num)/remove', 'Schedule::removeStaff/$1/$2');
+    $r->get('recurring', 'Schedule::recurring');
+    $r->post('recurring', 'Schedule::saveRecurrence');
+    $r->post('recurring/(:num)/delete', 'Schedule::deleteRecurrence/$1');
+    $r->post('recurring/(:num)/generate', 'Schedule::generate/$1');
+    $r->get('settings', 'Schedule::settings');
+    $r->post('settings/slots', 'Schedule::saveSlot');
+    $r->post('settings/slots/(:num)/delete', 'Schedule::deleteSlot/$1');
+    $r->post('settings/blocks', 'Schedule::saveBlock');
+    $r->post('settings/blocks/(:num)/delete', 'Schedule::deleteBlock/$1');
+    $r->post('settings/copy', 'Schedule::copySettings');
+});
+
 $routes->group('transcripts', ['filter' => 'area:transcripts'], static function ($r) {
     $r->get('/', 'Transcripts::index');
     $r->get('catalog', 'Transcripts::catalog');

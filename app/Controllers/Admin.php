@@ -85,7 +85,7 @@ class Admin extends BaseController
         }
         $data = [
             'label' => (string) $p('label'), 'year_number' => (int) $p('year_number'),
-            'start_date' => $p('start_date'), 'end_date' => $p('end_date'),
+            'start_date' => $p('start_date'), 'end_date' => $p('end_date'), 'week_one_starts' => $p('week_one_starts'),
             'moodle_overall_course_id' => (int) $p('moodle_overall_course_id') ?: null,
             'tuition_year_early' => $p('tuition_year_early'), 'tuition_year_late' => $p('tuition_year_late'), 'tuition_cutoff_date' => $p('tuition_cutoff_date'),
             'program_description' => $p('program_description'), 'transcript_notes' => $p('transcript_notes'),

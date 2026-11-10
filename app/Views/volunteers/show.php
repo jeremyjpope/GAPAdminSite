@@ -21,6 +21,15 @@
    <?php if ($homes): ?><dt class="col-sm-3">Host home</dt><dd class="col-sm-9"><?php foreach ($homes as $h): ?><a href="<?= site_url('housing') ?>"><?= esc($h['family_name']) ?></a> <?php endforeach ?></dd><?php endif ?>
    <?php if ($mentees): ?><dt class="col-sm-3">Mentoring</dt><dd class="col-sm-9"><?php foreach ($mentees as $s): ?><a class="badge text-bg-light text-decoration-none" href="<?= site_url('students/' . $s['id']) ?>"><?= esc(student_name($s)) ?></a> <?php endforeach ?></dd><?php endif ?>
   </dl></div></div>
+  <?php if (($teaching || $courseStaff) && \App\Libraries\Auth::can('schedule')): ?>
+  <div class="card mb-3"><div class="card-header bg-white fw-semibold d-flex justify-content-between"><span>Teaching</span><a class="small fw-normal" href="<?= site_url('schedule/staff?all=1') ?>">all staff</a></div>
+   <div class="card-body py-2 small">
+    <?php foreach ($courseStaff as $cs): ?><a class="badge text-bg-light text-decoration-none border" href="<?= site_url('courses/' . $cs['id']) ?>"><?= esc($cs['name']) ?> · <?= esc($cs['role']) ?></a> <?php endforeach ?>
+    <?php if ($teaching): ?><div class="mt-2" style="max-height:14rem;overflow:auto">
+    <?php foreach ($teaching as $t): ?><div><span class="text-secondary"><?= fmt_date($t['start_date'], 'D M j') ?></span> <a class="text-decoration-none text-body" href="<?= site_url('schedule/entries/' . $t['id']) ?>"><?= esc($t['course_name']) ?><?= $t['title'] ? ': ' . esc($t['title']) : '' ?></a><?= $t['group_label'] ? ' <span class="badge text-bg-light border py-0">' . esc($t['group_label']) . '</span>' : '' ?><?= $t['staff_role'] !== 'instructor' ? ' <span class="badge text-bg-light py-0">' . esc($t['staff_role']) . '</span>' : '' ?></div><?php endforeach ?>
+    </div><?php endif ?>
+   </div></div>
+  <?php endif ?>
   <?= view('notes/_panel', ['type' => 'volunteer', 'subjectId' => $v['id'], 'notes' => $notes, 'returnUrl' => site_url('volunteers/' . $v['id']) . '#notes']) ?>
  </div>
  <div class="col-lg-5">

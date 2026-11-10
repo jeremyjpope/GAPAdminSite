@@ -13,6 +13,20 @@
   <div class="col-6 col-lg-3"><div class="card"><div class="card-body"><div class="text-secondary small">Mentors</div><div class="stat"><?= $mentors ?></div><div class="small text-secondary"><?= $unmentored ?> student(s) without a mentor</div></div></div></div>
   <?php endif ?>
 </div>
+<?php if (Auth::can('schedule')): ?>
+<div class="card mb-3"><div class="card-header bg-white d-flex justify-content-between"><span class="fw-semibold">This week</span><a class="small" href="<?= site_url('schedule?date=' . $weekMon) ?>">Open the schedule</a></div>
+ <div class="card-body py-2">
+ <?php if (! $week): ?><span class="text-secondary small">Nothing on the schedule for <?= fmt_date($weekMon, 'M j') ?> – <?= fmt_date(date('Y-m-d', strtotime($weekMon . ' +6 days')), 'M j') ?>.</span><?php else: ?>
+ <div class="row g-2 small">
+ <?php for ($i = 0; $i < 7; $i++): $d = date('Y-m-d', strtotime($weekMon . " +{$i} days")); $es = array_filter($week, fn ($e) => $e['start_date'] <= $d && $e['end_date'] >= $d); if (! $es) continue; ?>
+  <div class="col-md-6 col-xl"><div class="fw-semibold <?= $d === date('Y-m-d') ? 'text-primary' : '' ?>"><?= fmt_date($d, 'D M j') ?></div>
+  <?php foreach ($es as $e): $c = $courses[$e['course_id']] ?? null; $s = $slots[$e['slot_id']] ?? null; ?>
+   <div class="text-truncate"><span class="d-inline-block rounded-circle me-1" style="width:.5rem;height:.5rem;background:<?= $c ? course_color($c) : '#999' ?>"></span><span class="text-secondary"><?= $s ? esc(explode('–', slot_time($s))[0]) : 'all day' ?></span> <a class="text-decoration-none text-body" href="<?= site_url('schedule/entries/' . $e['id']) ?>"><?= esc($c['name'] ?? '?') ?><?= $e['title'] ? ': ' . esc($e['title']) : '' ?></a><?= $e['group_label'] ? ' <span class="badge text-bg-light border py-0">' . esc($e['group_label']) . '</span>' : '' ?></div>
+  <?php endforeach ?></div>
+ <?php endfor ?>
+ </div><?php endif ?>
+ </div></div>
+<?php endif ?>
 <div class="row g-3">
   <?php if (Auth::can('students')): ?>
   <div class="col-lg-7"><div class="card"><div class="card-header bg-white fw-semibold">Students</div>

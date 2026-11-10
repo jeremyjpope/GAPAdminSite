@@ -24,10 +24,12 @@ Staff log in with their **Moodle username and password**. Only people listed und
 | **Mentors** | Assign one mentor per student. A mentor is simply a volunteer with the Guys Mentor or Girls Mentor role. |
 | **Volunteers** | One record per adult who serves (contact, DBC membership, Ministry Platform placement, driver clearance year, background check, SAAT, notes) with any number of role tags (Host Family, Life Skills + category and lead flag, Guys/Girls Mentor, Special Topic, …) and a status (active / inactive / potential). Mentors and host-home people are volunteers, so nobody is stored twice. Dated notes attach here too. |
 | **Groups** | Any number of "group sets" per year (presentation teams, Children's Learning Center age groups, guys' and girls' Friday night groups, accountability partners…). Each set has named groups; a student is in at most one group per set. Printable roster per set. |
+| **Courses** | The catalog of everything that can be scheduled, across years: pillar (Bible, Worldview, Leadership, Life Skills, Special Topic, Formation, Event, Break), life-skills category, audience, colour, default location, Moodle course id (for a later sync). Each course has default **staff** (anyone on the volunteer list: instructor, co-teacher, assistant, helper, substitute, guest), **assets** (links or uploaded files such as curriculum docs) and dated notes. |
+| **Schedule** | The yearly class map, replacing the "LS & ST Map" spreadsheet. Per year you define the **time slots** (the columns: Coed Morning 7:30–9, Guys Life Skill 1–3:30, …) and **blocks** (the monthly Leadership topics down the left). Sessions are one-off entries (date or date range, slot or all-day, course, detail, group, audience, location, LO/LA codes, status, comment) or come from a **standing week** pattern that writes a session onto every matching weekday, skipping breaks; every day can still be edited on its own. A session's staff start as the course's defaults and can get a sub or helper for that day. Views: **Week** (Mon–Sun × slots, guys and girls side by side, printable), **Year map** (one row per day, the spreadsheet's own shape), **Year grid** (courses × GAP weeks), **Hours** (per life-skills category and group, computed), **Staff** (who teaches when, with contact info). The dashboard shows this week; a volunteer's page shows what they teach. |
 | **Transcripts** | A per-year **course catalog** (pillar, course, description, term, hours) that defines the lines on the transcript. Enter letter grades by hand or **pull course totals from Moodle** for lines mapped to a Moodle course. Generates the official transcript as a PDF (same layout as the 2022-23 transcripts). |
 | **Site admin** | Who can log in and which areas they see; program years (dates, tuition rates, grading scale, Moodle overall-standing course); Moodle connection check. |
 
-Planned (not built): applicants / interview rubric, volunteer lists, multi-year transcript history import.
+Planned (not built): applicants / interview rubric, multi-year transcript history import, schedule → Moodle sync.
 
 ## Stack
 
@@ -92,6 +94,22 @@ with the check number and date; the full cell text is kept in the note. The impo
 re-running it updates students and only adds contacts, vehicles and payments that are not already there.
 `writable/import/` is git-ignored because the file contains personal data.
 
+### Importing a yearly class map (Life Skills & Special Topics Map)
+
+```bash
+python3 tools/map_to_json.py "/path/to/Life Skills & Special Topics Maps- CURRENT.xlsx" "26-27 LS & ST Map" writable/import/map2627.json 2026-27
+php spark gap:import-schedule writable/import/map2627.json --year 2026-27
+```
+
+The parser reads the tab's header row for the slots, column A for the blocks, the GAP Week column
+for week 1, and turns every cell into a session (course, detail, group, LO/LA codes, lead, location,
+confirmation marks). The JSON format is documented in `docs/schedule_import.md`. The import creates
+the year's slots and blocks only when it has none, creates courses it has not seen (check the "New
+courses" line and merge or rename in Courses afterwards), matches leads to the volunteer list by name,
+and skips sessions it already has, so it can be re-run. `--replace` deletes the year's sessions first.
+The 2024-25, 2025-26 and 2026-27 tabs have been imported; the 2023-24 and older tabs use a different
+layout (separate Life Skills and Special Topics maps) and were not.
+
 ## Production deployment (Ubuntu, nginx, php-fpm, MySQL)
 
 1. Create a database and user, e.g. `gapadmin`, and put the credentials in `.env` (start from `env.example`, set `CI_ENVIRONMENT = production`, `app.baseURL`, `database.*`, `moodle.wsToken`).
@@ -148,9 +166,10 @@ app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, M
 app/Views/                      Bootstrap views; transcripts/pdf.php is the PDF template
 app/Database/Migrations/        schema (one initial migration)
 app/Database/Seeds/             InitialSeeder (super admin, 2026-27, transcript catalog)
-app/Commands/                   gap:import, gap:year, gap:volunteer-status (spark commands)
+app/Commands/                   gap:import, gap:year, gap:volunteer-status, gap:import-schedule (spark commands)
 app/Helpers/gap_helper.php      current_year(), money(), letter_for(), ...
 tools/excel_to_json.py          Excel → JSON for the importer
+tools/map_to_json.py            class map tab → JSON for gap:import-schedule
 public/img/gap-logo.png         logo used on the transcript
 ```
 
@@ -161,8 +180,12 @@ public/img/gap-logo.png         logo used on the transcript
 `volunteers` (one per adult, not per year) → `volunteer_roles` (role, life-skills category, is_lead).
 `students.mentor_id` points at a volunteer. `host_homes` belong to a program year and link their people
 through `host_home_people` → `volunteers`. `transcript_courses` is the per-year catalog.
+`courses` (cross-year) → `course_staff` (volunteer + role), `course_assets`. Per year: `schedule_slots`,
+`schedule_blocks`, `schedule_recurrences` (standing week) and `schedule_entries` (one session per row,
+`slot_id` null = all day, `recurrence_id` set when generated) → `entry_staff`. `program_years.week_one_starts`
+gives the GAP week numbers.
 `group_sets` → `groups` → `group_members` hold the team / Friday night / accountability groupings.
-`notes` is polymorphic (`subject_type` student|host_home + `subject_id`), with `noted_on` (date), optional
+`notes` is polymorphic (`subject_type` student|host_home|volunteer|course + `subject_id`), with `noted_on` (date), optional
 `noted_time`, `category`, `user_id` and an `author_name` snapshot.
 `users` + `user_areas` is the login allowlist. All Moodle references are plain integer ids
 (`moodle_userid`, `moodle_course_id`, `moodle_overall_course_id`).

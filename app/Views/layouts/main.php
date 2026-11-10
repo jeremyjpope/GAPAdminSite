@@ -46,6 +46,8 @@
         ['mentors', 'Mentors', 'person-check', 'mentors'],
         ['groups', 'Groups', 'diagram-3', 'groups'],
         ['volunteers', 'Volunteers', 'people-fill', 'volunteers'],
+        ['schedule', 'Schedule', 'calendar-week', 'schedule'],
+        ['courses', 'Courses', 'journal-bookmark', 'schedule'],
         ['transcripts', 'Transcripts', 'file-earmark-text', 'transcripts'],
       ];
       $path = trim(uri_string(), '/');

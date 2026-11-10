@@ -88,3 +88,55 @@ function flash_alerts(): string
 
     return $out;
 }
+
+/** Colour for a course row (its own colour, else its pillar's). */
+function course_color(array $course): string
+{
+    return $course['color'] ?: ((new \Config\Schedule())->pillars[$course['pillar']][1] ?? '#6c757d');
+}
+
+/** Hours of one schedule entry per day it covers: the slot length (summing spanned slots); 0 for all-day entries. */
+function schedule_entry_hours(array $e, array $slotsById): float
+{
+    if (! $e['slot_id'] || ! isset($slotsById[$e['slot_id']])) {
+        return 0.0;
+    }
+    $ordered = array_values($slotsById);
+    usort($ordered, fn ($a, $b) => $a['sort_order'] <=> $b['sort_order'] ?: $a['id'] <=> $b['id']);
+    $i = array_search($e['slot_id'], array_column($ordered, 'id'), false);
+    $h = 0.0;
+    for ($k = 0; $k < max(1, (int) $e['slot_span']); $k++) {
+        $s = $ordered[$i + $k] ?? null;
+        if ($s && $s['start_time'] && $s['end_time']) {
+            $h += (strtotime('1970-01-01 ' . $s['end_time']) - strtotime('1970-01-01 ' . $s['start_time'])) / 3600;
+        }
+    }
+    $days = 0;
+    for ($d = strtotime($e['start_date']); $d <= strtotime($e['end_date']); $d += 86400) {
+        $days++;
+    }
+
+    return $h * max(1, $days);
+}
+
+/** GAP week number for a date, from the year's week_one_starts (null if not set or before week 1). */
+function gap_week(string $date, array $year): ?int
+{
+    if (empty($year['week_one_starts'])) {
+        return null;
+    }
+    $n = intdiv((int) ((strtotime($date) - strtotime($year['week_one_starts'])) / 86400), 7) + 1;
+
+    return $n >= 1 ? $n : null;
+}
+
+/** "7:30-9:00" style label for a slot. */
+function slot_time(array $slot): string
+{
+    $f = fn ($t) => $t ? ltrim(date('g:i', strtotime('1970-01-01 ' . $t)), '0') : '';
+    if (! $slot['start_time'] && ! $slot['end_time']) {
+        return '';
+    }
+
+    return $f($slot['start_time']) . '–' . $f($slot['end_time']);
+}

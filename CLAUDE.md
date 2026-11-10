@@ -32,6 +32,13 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 - Notes (`app/Controllers/Notes.php`, `app/Views/notes/_panel.php`) are polymorphic; to attach notes to a
   new kind of record add it to `NoteModel::SUBJECTS` (subject => required area) and the `subject()`
   loader, then include the panel view with `type`, `subjectId`, `notes`, `returnUrl`.
+- Courses and the schedule (`app/Controllers/{Courses,Schedule}.php`, `Config\Schedule` for pillars,
+  categories, roles, statuses): courses are cross-year, everything else is per program year. A
+  session is a `schedule_entries` row; recurring patterns (`schedule_recurrences`) only *generate*
+  rows, they are not expanded at view time. Slot order = `sort_order`; `slot_span` > 1 means the
+  session runs into the following slot(s). Hours come from slot length (helper
+  `schedule_entry_hours()`); all-day entries count 0. GAP week numbers come from
+  `program_years.week_one_starts`. Course assets upload to `writable/uploads/courses/<id>/`.
 - Moodle calls go through `app/Libraries/MoodleClient.php` only. The server-side token belongs
   to the *Moodle mobile web service*, which does NOT include cohort functions; prefer
   `core_enrol_get_enrolled_users`, `core_user_get_users_by_field`, `core_course_get_courses`,
@@ -49,7 +56,10 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
   Note the built-in server caches env vars: after editing `.env`, restart `spark serve`.
 - Re-import the Excel data with `tools/excel_to_json.py` + `php spark gap:import` (see README);
   `php spark gap:year` creates a missing program year; `php spark gap:volunteer-status <current year json>`
-  sets the volunteers named in that file active and all others inactive (status is not year-scoped). The import is idempotent but re-applies sheet
+  sets the volunteers named in that file active and all others inactive (status is not year-scoped).
+- Class map import: `tools/map_to_json.py` (one tab → JSON, contract in docs/schedule_import.md) then
+  `php spark gap:import-schedule <json> --year LABEL`. Idempotent; `--replace` wipes the year's
+  sessions first. Only the 24-25, 25-26 and 26-27 tab layouts are supported. The import is idempotent but re-applies sheet
   values to students and replaces group membership; a payment is a duplicate only when date, amount
   AND note match, so re-importing after the parser's note wording changed could double payments;
   check with a student+date+amount count before and after. Payments entered in the site are real
@@ -83,7 +93,8 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
   features, setup or deployment change.
 
 ## Roadmap / not built yet
-Applicants and interview rubric (area slug `applicants` already exists), the Men Volunteer List tab
+Applicants and interview rubric (area slug `applicants` already exists), schedule → Moodle sync
+(`courses.moodle_course_id` is already there), the Men Volunteer List tab
 (a subset of the volunteer list, ignored on purpose),
 importing prior years' transcripts, finer Moodle→transcript mapping (one Moodle course feeding
 several transcript lines), gender-specific catalog lines (today unused lines simply don't print).

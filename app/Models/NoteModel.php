@@ -23,7 +23,7 @@ class NoteModel extends Model
         'praise'     => 'Praise',
     ];
 
-    public const SUBJECTS = ['student' => 'students', 'host_home' => 'housing', 'volunteer' => 'volunteers']; // subject => required area
+    public const SUBJECTS = ['student' => 'students', 'host_home' => 'housing', 'volunteer' => 'volunteers', 'course' => 'schedule']; // subject => required area
 
     /** Notes for one subject, newest first. */
     public function forSubject(string $type, int $id): array

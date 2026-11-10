@@ -96,6 +96,9 @@ class Notes extends BaseController
         } elseif ($type === 'volunteer') {
             $row = (new VolunteerModel())->find($id);
             $label = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
+        } elseif ($type === 'course') {
+            $row = (new \App\Models\CourseModel())->find($id);
+            $label = $row['name'] ?? '';
         } else {
             $row = (new HostHomeModel())->find($id);
             $label = $row['family_name'] ?? '';

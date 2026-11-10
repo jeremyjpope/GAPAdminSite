@@ -60,10 +60,15 @@ class Volunteers extends BaseController
             }
         }
         $mentees = (new StudentModel())->where('mentor_id', $id)->orderBy('last_name')->findAll();
+        $year     = current_year();
+        $teaching = $year ? (new \App\Models\EntryStaffModel())->select('entry_staff.role AS staff_role, schedule_entries.id, schedule_entries.start_date, schedule_entries.end_date, schedule_entries.title, schedule_entries.group_label, schedule_entries.status, courses.name AS course_name')
+            ->join('schedule_entries', 'schedule_entries.id = entry_staff.entry_id')->join('courses', 'courses.id = schedule_entries.course_id')
+            ->where('entry_staff.volunteer_id', $id)->where('schedule_entries.program_year_id', $year['id'])->orderBy('schedule_entries.start_date')->findAll() : [];
+        $courseStaff = (new \App\Models\CourseStaffModel())->select('course_staff.role, courses.id, courses.name')->join('courses', 'courses.id = course_staff.course_id')->where('volunteer_id', $id)->findAll();
 
         return view('volunteers/show', [
             'title' => trim($v['first_name'] . ' ' . $v['last_name']), 'v' => $v, 'roles' => $roles, 'homes' => $homes, 'mentees' => $mentees,
-            'cfg' => config('Volunteers'), 'notes' => (new NoteModel())->forSubject('volunteer', $id),
+            'cfg' => config('Volunteers'), 'notes' => (new NoteModel())->forSubject('volunteer', $id), 'teaching' => $teaching, 'courseStaff' => $courseStaff,
         ]);
     }
 

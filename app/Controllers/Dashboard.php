@@ -6,6 +6,9 @@ use App\Libraries\Auth;
 use App\Models\HostHomeModel;
 use App\Models\VolunteerModel;
 use App\Models\PaymentModel;
+use App\Models\ScheduleEntryModel;
+use App\Models\ScheduleSlotModel;
+use App\Models\CourseModel;
 use App\Models\ProgramYearModel;
 use App\Models\StudentModel;
 use App\Models\TuitionAccountModel;
@@ -26,7 +29,18 @@ class Dashboard extends BaseController
         $recent = (new PaymentModel())->whereIn('student_id', $ids)->orderBy('paid_on', 'DESC')->orderBy('id', 'DESC')->limit(8)->findAll();
         $byId   = array_column($students, null, 'id');
 
+        // this week's sessions (Mon-Sun) for the schedule panel
+        $mon   = date('Y-m-d', strtotime('monday this week'));
+        $sun   = date('Y-m-d', strtotime($mon . ' +6 days'));
+        $week  = Auth::can('schedule') ? (new ScheduleEntryModel())->where('program_year_id', $yid)->where('start_date <=', $sun)->where('end_date >=', $mon)->where('status !=', 'cancelled')->orderBy('start_date')->orderBy('slot_id')->findAll() : [];
+        $slots = array_column((new ScheduleSlotModel())->where('program_year_id', $yid)->orderBy('sort_order')->findAll(), null, 'id');
+        $courses = $week ? array_column((new CourseModel())->findAll(), null, 'id') : [];
+
         return view('dashboard', [
+            'week'        => $week,
+            'weekMon'     => $mon,
+            'slots'       => $slots,
+            'courses'     => $courses,
             'title'       => 'Dashboard',
             'year'        => $year,
             'students'    => $students,
