@@ -90,6 +90,23 @@ class MoodleClient
 
     // ---- Convenience wrappers -------------------------------------------------
 
+    /** Email address of a Moodle user, via the service token. Returns '' when unavailable. */
+    public function userEmail(int $moodleUserId): string
+    {
+        if (! $this->hasServiceToken()) {
+            return '';
+        }
+        try {
+            $r = $this->call('core_user_get_users_by_field', ['field' => 'id', 'values' => [$moodleUserId]]);
+
+            return strtolower(trim((string) ($r[0]['email'] ?? '')));
+        } catch (RuntimeException $e) {
+            log_message('warning', 'Could not read Moodle email for user {id}: {m}', ['id' => $moodleUserId, 'm' => $e->getMessage()]);
+
+            return '';
+        }
+    }
+
     /**
      * Students enrolled in a course (users holding the "student" role there).
      * Returns user arrays: id, username, email, firstname, lastname, fullname.

@@ -92,6 +92,26 @@ server {
 
 5. Add a TLS certificate (certbot) and log in with your Moodle account. The seeder creates the super admin by email (`jpope@dentonbible.org`); the first successful login stores the Moodle user id.
 
+### Deploying updates
+
+The live site is `/var/www/gapadmin` on the Moodle server (`ubuntu@jeremyjpope.com`), served by the
+`admin.gapdbc.org` nginx site. The checkout there receives pushes directly
+(`receive.denyCurrentBranch = updateInstead`), so from a laptop with the server key:
+
+```bash
+git push ssh://ubuntu@jeremyjpope.com/var/www/gapadmin main
+```
+
+Then on the server, when `composer.json` or the migrations changed:
+
+```bash
+cd /var/www/gapadmin && composer install --no-dev --optimize-autoloader && sudo -u www-data php spark migrate
+```
+
+Alternatively add the server's deploy key (`~/.ssh/gapadmin_deploy.pub` on the server) to the GitHub
+repo, add `origin` there, and `git pull` instead. `writable/` is owned by `www-data`; run `spark`
+commands on the server with `sudo -u www-data` so log, session and upload files keep that owner.
+
 ## Project layout
 
 ```

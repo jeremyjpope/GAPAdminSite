@@ -27,19 +27,22 @@ class Auth extends BaseController
             return redirect()->back()->with('error', 'Enter your Moodle username and password.');
         }
 
+        $moodle = new MoodleClient();
         try {
-            $m = (new MoodleClient())->login($username, $password);
+            $m = $moodle->login($username, $password);
         } catch (RuntimeException $e) {
             log_message('warning', 'Moodle login failed for {u}: {m}', ['u' => $username, 'm' => $e->getMessage()]);
 
             return redirect()->back()->with('error', $e->getMessage());
         }
 
-        // Match against the allowlist: by Moodle user id first, then by username, then by email.
+        // Match against the allowlist: Moodle user id, then Moodle username, then the
+        // account's email (from Moodle, or whatever was typed if that looks like an email).
+        $email = $moodle->userEmail($m['userid']) ?: (str_contains($username, '@') ? strtolower($username) : '');
         $users = new UserModel();
         $row   = $users->where('moodle_userid', $m['userid'])->first()
               ?? $users->where('LOWER(username)', strtolower($m['username']))->first()
-              ?? $users->where('LOWER(email)', strtolower($username))->first();
+              ?? ($email !== '' ? $users->where('LOWER(email)', $email)->first() : null);
 
         if (! $row || ! $row['is_active']) {
             log_message('warning', 'Login denied (not allowlisted): {u}', ['u' => $m['username']]);
@@ -52,6 +55,7 @@ class Auth extends BaseController
             'moodle_userid' => $m['userid'],
             'username'      => $m['username'],
             'fullname'      => $m['fullname'] ?: $row['fullname'],
+            'email'         => $row['email'] ?: ($email ?: null),
             'last_login_at' => date('Y-m-d H:i:s'),
         ]);
         $row   = $users->find($row['id']);
