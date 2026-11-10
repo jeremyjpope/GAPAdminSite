@@ -1,5 +1,5 @@
 <?= $this->extend('layouts/main') ?>
-<?= $this->section('actions') ?><a class="btn btn-sm btn-outline-secondary" href="<?= site_url('tuition') ?>">All students</a> <a class="btn btn-sm btn-outline-secondary" href="<?= site_url('students/' . $s['id']) ?>">Student record</a><?= $this->endSection() ?>
+<?= $this->section('actions') ?><?php if (! empty($acct['mp_link'])): ?><a class="btn btn-sm btn-success" href="<?= esc($acct['mp_link']) ?>" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i> Payment plan in Ministry Platform</a> <?php endif ?><a class="btn btn-sm btn-outline-secondary" href="<?= site_url('tuition') ?>">All students</a> <a class="btn btn-sm btn-outline-secondary" href="<?= site_url('students/' . $s['id']) ?>">Student record</a><?= $this->endSection() ?>
 <?= $this->section('content') ?>
 <?php $due = (float) ($acct['total_due'] ?? 0); ?>
 <div class="row g-3">
@@ -11,6 +11,7 @@
     <div class="mb-2"><label class="form-label">Total due for the year</label><div class="input-group"><span class="input-group-text">$</span><input class="form-control" name="total_due" id="total_due" value="<?= esc($acct['total_due'] ?? $year['tuition_year_early']) ?>"></div>
       <div class="form-text">Early: <?= money($year['tuition_year_early']) ?> · Late: <?= money($year['tuition_year_late']) ?> <a href="#" onclick="document.getElementById('total_due').value='<?= (float) $year['tuition_year_early'] ?>';return false">use early</a> · <a href="#" onclick="document.getElementById('total_due').value='<?= (float) $year['tuition_year_late'] ?>';return false">use late</a></div></div>
     <div class="mb-2"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="3" placeholder="Who pays, link sent dates, post-dated checks…"><?= esc($acct['notes'] ?? '') ?></textarea></div>
+    <div class="mb-2"><label class="form-label">Ministry Platform payment plan link</label><input class="form-control" name="mp_link" value="<?= esc($acct['mp_link'] ?? '') ?>" placeholder="https://…"><div class="form-text">Paste the URL of this student's payment plan in MP; it shows as a button on this page and a link on the Tuition list.</div></div>
     <button class="btn btn-dark btn-sm">Save plan</button>
    </form>
   </div></div>

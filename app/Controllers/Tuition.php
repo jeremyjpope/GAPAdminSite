@@ -17,7 +17,8 @@ class Tuition extends BaseController
         $accts    = array_column((new TuitionAccountModel())->whereIn('student_id', $ids)->findAll(), null, 'student_id');
         $paid     = [];
         $today    = date('Y-m-d');
-        foreach ((new PaymentModel())->whereIn('student_id', $ids)->findAll() as $p) {
+        $payments = (new PaymentModel())->whereIn('student_id', $ids)->orderBy('paid_on')->orderBy('id')->findAll();
+        foreach ($payments as $p) {
             $row = &$paid[$p['student_id']];
             $row ??= ['paid' => 0.0, 'scheduled' => 0.0, 'last_paid' => null];
             if ($p['paid_on'] > $today) {
@@ -29,7 +30,30 @@ class Tuition extends BaseController
             unset($row);
         }
 
-        return view('tuition/index', ['title' => 'Tuition', 'year' => $year, 'students' => $students, 'accts' => $accts, 'paid' => $paid]);
+        // list or month-grid view; the choice is remembered in a cookie
+        $view = $this->request->getGet('view');
+        if (in_array($view, ['list', 'grid'], true)) {
+            $this->response->setCookie('tuition_view', $view, 86400 * 365);
+        } else {
+            $view = $this->request->getCookie('tuition_view') === 'grid' ? 'grid' : 'list';
+        }
+
+        // months July of the first calendar year through April of the second, like the spreadsheet
+        $months = [];
+        if ($year && preg_match('/^(\d{4})-(\d{2})$/', $year['label'], $m)) {
+            $y1 = (int) $m[1];
+            for ($i = 0; $i < 10; $i++) {
+                $months[] = date('Y-m', mktime(0, 0, 0, 7 + $i, 1, $y1));
+            }
+        }
+        $byMonth = [];   // student_id => 'YYYY-MM' (or 'other') => payments
+        foreach ($payments as $p) {
+            $k = substr((string) $p['paid_on'], 0, 7);
+            $byMonth[$p['student_id']][in_array($k, $months, true) ? $k : 'other'][] = $p;
+        }
+
+        return view('tuition/index', ['title' => 'Tuition', 'year' => $year, 'students' => $students, 'accts' => $accts, 'paid' => $paid,
+            'view' => $view, 'months' => $months, 'byMonth' => $byMonth, 'today' => $today]);
     }
 
     public function student(int $id)
@@ -58,7 +82,11 @@ class Tuition extends BaseController
             'plan_type'  => $this->request->getPost('plan_type'),
             'total_due'  => (float) str_replace([',', '$'], '', (string) $this->request->getPost('total_due')),
             'notes'      => trim((string) $this->request->getPost('notes')) ?: null,
+            'mp_link'    => trim((string) $this->request->getPost('mp_link')) ?: null,
         ];
+        if ($data['mp_link'] && ! preg_match('#^https?://#i', $data['mp_link'])) {
+            $data['mp_link'] = 'https://' . $data['mp_link'];
+        }
         $existing = $m->where('student_id', $id)->first();
         $existing ? $m->update($existing['id'], $data) : $m->insert($data);
 

@@ -9,7 +9,7 @@ class TuitionAccountModel extends Model
     protected $table         = 'tuition_accounts';
     protected $primaryKey    = 'id';
     protected $returnType    = 'array';
-    protected $allowedFields = ['student_id', 'plan_type', 'total_due', 'notes'];
+    protected $allowedFields = ['student_id', 'plan_type', 'total_due', 'notes', 'mp_link'];
     protected $useTimestamps = true;
     protected $dateFormat    = 'datetime';
 }
