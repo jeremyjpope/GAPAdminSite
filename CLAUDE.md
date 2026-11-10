@@ -50,8 +50,9 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 - Re-import the Excel data with `tools/excel_to_json.py` + `php spark gap:import` (see README);
   `php spark gap:year` creates a missing program year. The import is idempotent but re-applies sheet
   values to students and replaces group membership; a payment is a duplicate only when date, amount
-  AND note match, so re-importing after the parser's note wording changed will double payments
-  (happened once for 2026-27; dedupe on student+date+amount keeping the lowest id).
+  AND note match, so re-importing after the parser's note wording changed could double payments;
+  check with a student+date+amount count before and after. Payments entered in the site are real
+  data: never "dedupe" them against the sheet.
 - All eight years 2019-20..2026-27 are imported on the live site (Nov 2026). The workbooks live in
   OneDrive "GAP Team - Documents/Yearly Databases/<year>/". Each year's layout differs; the parser is
   header/title driven and has a regression check: Years 6-8 output must not change when touching it.
