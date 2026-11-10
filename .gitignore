@@ -129,3 +129,6 @@ _modules/*
 /writable/*.db
 /writable/import/*
 !/writable/import/.gitignore
+
+# never serve session files
+/public/null/

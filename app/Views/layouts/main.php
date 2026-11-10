@@ -5,6 +5,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= esc($title ?? 'GAP Admin') ?> · GAP Admin</title>
+<link rel="icon" type="image/png" href="<?= base_url('favicon.png') ?>">
+<link rel="apple-touch-icon" href="<?= base_url('apple-touch-icon.png') ?>">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 <style>
@@ -27,7 +29,7 @@
 <div class="container-fluid">
 <div class="row">
   <nav class="col-md-3 col-lg-2 d-md-block sidebar p-3">
-    <a href="<?= site_url('/') ?>" class="d-block brand text-decoration-none mb-4">G<small>|</small>G <span class="d-block small fw-normal" style="letter-spacing:.1em">GAP ADMIN</span></a>
+    <a href="<?= site_url('/') ?>" class="d-block brand text-decoration-none mb-4"><img src="<?= base_url('img/gap-logo-light.png') ?>" alt="GAP" style="height:56px"><span class="d-block small fw-normal mt-1" style="letter-spacing:.15em">GAP ADMIN</span></a>
     <?php if (count(all_years()) > 1): ?>
     <form method="post" action="<?= site_url('year/switch') ?>" class="mb-3"><?= csrf_field() ?>
       <select name="year_id" class="form-select form-select-sm" onchange="this.form.submit()">
