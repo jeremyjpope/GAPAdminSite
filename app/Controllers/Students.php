@@ -65,7 +65,10 @@ class Students extends BaseController
         $acct = (new TuitionAccountModel())->where('student_id', $id)->first();
         $paid = (float) ((new PaymentModel())->where('student_id', $id)->where('paid_on <=', date('Y-m-d'))->selectSum('amount')->first()['amount'] ?? 0);
 
+        $applicant = (new \App\Models\ApplicantModel())->where('student_id', $id)->first();
+
         return view('students/show', [
+            'applicant' => $applicant,
             'title'    => student_name($s),
             's'        => $s,
             'contacts' => (new StudentContactModel())->where('student_id', $id)->findAll(),

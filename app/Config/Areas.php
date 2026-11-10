@@ -19,7 +19,7 @@ class Areas extends BaseConfig
         'groups'      => ['name' => 'Groups',        'desc' => 'Team, Friday night, life skills and accountability groupings.'],
         'schedule'    => ['name' => 'Schedule',      'desc' => 'Course catalog, instructors and the weekly / yearly class map.'],
         'transcripts' => ['name' => 'Transcripts',   'desc' => 'Course catalog, grades and transcript PDFs.'],
-        'applicants'  => ['name' => 'Applicants',    'desc' => 'Admissions pipeline and interview scores (future).'],
+        'applicants'  => ['name' => 'Applicants',    'desc' => 'Applicants, admissions checklist, interview rubric scores, accept into the program.'],
         'admin'       => ['name' => 'Site Admin',    'desc' => 'Manage who can log in, program years and settings.'],
     ];
 }

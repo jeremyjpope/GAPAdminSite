@@ -84,6 +84,21 @@ $routes->group('groups', ['filter' => 'area:groups'], static function ($r) {
     $r->get('sets/(:num)/print', 'Groups::printSet/$1');
 });
 
+$routes->group('applicants', ['filter' => 'area:applicants'], static function ($r) {
+    $r->get('/', 'Applicants::index');
+    $r->get('rubric', 'Applicants::rubric');
+    $r->get('new', 'Applicants::create');
+    $r->post('/', 'Applicants::store');
+    $r->get('(:num)', 'Applicants::show/$1');
+    $r->get('(:num)/edit', 'Applicants::edit/$1');
+    $r->post('(:num)', 'Applicants::update/$1');
+    $r->post('(:num)/delete', 'Applicants::delete/$1');
+    $r->post('(:num)/status', 'Applicants::setStatus/$1');
+    $r->post('(:num)/steps', 'Applicants::saveSteps/$1');
+    $r->post('(:num)/scores', 'Applicants::saveScores/$1');
+    $r->post('(:num)/accept', 'Applicants::accept/$1');
+});
+
 $routes->group('courses', ['filter' => 'area:schedule'], static function ($r) {
     $r->get('/', 'Courses::index');
     $r->get('new', 'Courses::create');

@@ -21,9 +21,13 @@ class NoteModel extends Model
         'housing'    => 'Housing',
         'medical'    => 'Medical',
         'praise'     => 'Praise',
+        'reference'  => 'Reference',
+        'interview'  => 'Interview',
+        'decision'   => 'Decision / acceptance',
+        'compliance' => 'Background check / SAAT / MP',
     ];
 
-    public const SUBJECTS = ['student' => 'students', 'host_home' => 'housing', 'volunteer' => 'volunteers', 'course' => 'schedule']; // subject => required area
+    public const SUBJECTS = ['student' => 'students', 'host_home' => 'housing', 'volunteer' => 'volunteers', 'course' => 'schedule', 'applicant' => 'applicants']; // subject => required area
 
     /** Notes for one subject, newest first. */
     public function forSubject(string $type, int $id): array

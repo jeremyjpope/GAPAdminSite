@@ -39,6 +39,11 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
   session runs into the following slot(s). Hours come from slot length (helper
   `schedule_entry_hours()`); all-day entries count 0. GAP week numbers come from
   `program_years.week_one_starts`. Course assets upload to `writable/uploads/courses/<id>/`.
+- Applicants (`app/Controllers/Applicants.php`, `Config\Applicants` for statuses, checklist steps and rubric
+  categories): per program year; `accept()` is the only way to reach status accepted because it creates or
+  links the student row and copies the fields listed there. A student links to at most one applicant.
+  Rubric scores are per site user (`user_id`) or, when imported from the sheet, per `scorer_name`; blank
+  scores are rows that do not exist, never zeros. Applicants' dated history uses the notes panel.
 - Moodle calls go through `app/Libraries/MoodleClient.php` only. The server-side token belongs
   to the *Moodle mobile web service*, which does NOT include cohort functions; the site-wide user search
   (`core_user_get_users`, `core_user_search_identity`) is blocked too, but `core_enrol_search_users`
@@ -59,6 +64,8 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 - Re-import the Excel data with `tools/excel_to_json.py` + `php spark gap:import` (see README);
   `php spark gap:year` creates a missing program year; `php spark gap:volunteer-status <current year json>`
   sets the volunteers named in that file active and all others inactive (status is not year-scoped).
+- Applicants import: `tools/applicants_to_json.py` then `php spark gap:import-applicants <json> --year LABEL`
+  (contract in docs/applicants_import.md; Years 5–8 imported). Re-runnable, fills blanks only.
 - Class map import: `tools/map_to_json.py` (one tab → JSON, contract in docs/schedule_import.md) then
   `php spark gap:import-schedule <json> --year LABEL`. Idempotent; `--replace` wipes the year's
   sessions first. Only the 24-25, 25-26 and 26-27 tab layouts are supported. The import is idempotent but re-applies sheet
@@ -95,7 +102,7 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
   features, setup or deployment change.
 
 ## Roadmap / not built yet
-Applicants and interview rubric (area slug `applicants` already exists), schedule → Moodle sync
+Schedule → Moodle sync
 (`courses.moodle_course_id` is already there), the Men Volunteer List tab
 (a subset of the volunteer list, ignored on purpose),
 importing prior years' transcripts, finer Moodle→transcript mapping (one Moodle course feeding

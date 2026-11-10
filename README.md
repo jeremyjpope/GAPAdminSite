@@ -24,12 +24,13 @@ Staff log in with their **Moodle username and password**. Only people listed und
 | **Mentors** | Assign one mentor per student. A mentor is simply a volunteer with the Guys Mentor or Girls Mentor role. |
 | **Volunteers** | One record per adult who serves (contact, DBC membership, Ministry Platform placement, driver clearance year, background check, SAAT, notes) with any number of role tags (Host Family, Life Skills + category and lead flag, Guys/Girls Mentor, Special Topic, …) and a status (active / inactive / potential). Mentors and host-home people are volunteers, so nobody is stored twice. Dated notes attach here too. |
 | **Groups** | Any number of "group sets" per year (presentation teams, Children's Learning Center age groups, guys' and girls' Friday night groups, accountability partners…). Each set has named groups; a student is in at most one group per set. Printable roster per set. |
+| **Applicants** | Admissions for the selected year, replacing the Applicants / Guys / Girls tabs. One record per applicant (contact, parents' emails, birthday, the details that later become student fields, a link to the application in Ministry Platform) with a status (applied, references pending, interview scheduled, interviewed, accepted, waitlisted, declined, withdrawn), a dated **checklist** (application, preview, references, interview, decision, commitment letter, background check/SAAT/MP, books…), dated notes, and the **interview rubric**: every leadership-team member enters their own 1–10 scores for Hunger, Humility, Honor and Fit; empty scores are ignored and the rubric page shows the matrix and averages per sex. **Accept** creates the student record for that year (or links an existing one), copies the details, adds the parents as contacts and marks the applicant accepted; declined and waitlisted applicants stay on the list, and a name search covers every year so re-applicants link to their earlier application. |
 | **Courses** | The catalog of everything that can be scheduled, across years: pillar (Bible, Worldview, Leadership, Life Skills, Special Topic, Formation, Event, Break), life-skills category, audience, colour, default location, Moodle course id (for a later sync). Each course has default **staff** (anyone on the volunteer list: instructor, co-teacher, assistant, helper, substitute, guest), **assets** (links or uploaded files such as curriculum docs) and dated notes. |
 | **Schedule** | The yearly class map, replacing the "LS & ST Map" spreadsheet. Per year you define the **time slots** (the columns: Coed Morning 7:30–9, Guys Life Skill 1–3:30, …) and **blocks** (the monthly Leadership topics down the left). Sessions are one-off entries (date or date range, slot or all-day, course, detail, group, audience, location, LO/LA codes, status, comment) or come from a **standing week** pattern that writes a session onto every matching weekday, skipping breaks; every day can still be edited on its own. A session's staff start as the course's defaults and can get a sub or helper for that day. Views: **Week** (Mon–Sun × slots, guys and girls side by side, printable), **Year map** (one row per day, the spreadsheet's own shape), **Year grid** (courses × GAP weeks), **Hours** (per life-skills category and group, computed), **Staff** (who teaches when, with contact info). The dashboard shows this week; a volunteer's page shows what they teach. |
 | **Transcripts** | A per-year **course catalog** (pillar, course, description, term, hours) that defines the lines on the transcript. Enter letter grades by hand or **pull course totals from Moodle** for lines mapped to a Moodle course. Generates the official transcript as a PDF (same layout as the 2022-23 transcripts). |
 | **Site admin** | Who can log in and which areas they see (a Moodle picker lists the overall course's staff and searches every Moodle account by name, filling in username, email and id); program years (dates, tuition rates, grading scale, Moodle overall-standing course); Moodle connection check. |
 
-Planned (not built): applicants / interview rubric, multi-year transcript history import, schedule → Moodle sync.
+Planned (not built): multi-year transcript history import, schedule → Moodle sync.
 
 ## Stack
 
@@ -110,6 +111,19 @@ and skips sessions it already has, so it can be re-run. `--replace` deletes the 
 The 2024-25, 2025-26 and 2026-27 tabs have been imported; the 2023-24 and older tabs use a different
 layout (separate Life Skills and Special Topics maps) and were not.
 
+### Importing a year's applicants
+
+```bash
+python3 tools/applicants_to_json.py "/path/to/2026-27 Year 8 Database.xlsx" writable/import/applicants2627.json 2026-27
+php spark gap:import-applicants writable/import/applicants2627.json --year 2026-27
+```
+
+Reads the `Applicants` tab (2026-27), `Guys`/`Girls` tabs (2024-25, 2025-26) or `2023-24 GUY`/`GIRL` tabs by
+header name, plus the `Interview Rubric` tab when there is one (scores keyed by the scorer's first name).
+Format in `docs/applicants_import.md`. Applicants matching a student of that year are linked and marked
+accepted; the rest keep the sheet's status (green name = accepted, red = declined, "withdrew" = withdrawn).
+Re-runnable; sheet values fill blanks only. Years 5–8 (2023-24 to 2026-27) have been imported.
+
 ## Production deployment (Ubuntu, nginx, php-fpm, MySQL)
 
 1. Create a database and user, e.g. `gapadmin`, and put the credentials in `.env` (start from `env.example`, set `CI_ENVIRONMENT = production`, `app.baseURL`, `database.*`, `moodle.wsToken`).
@@ -166,10 +180,11 @@ app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, M
 app/Views/                      Bootstrap views; transcripts/pdf.php is the PDF template
 app/Database/Migrations/        schema (one initial migration)
 app/Database/Seeds/             InitialSeeder (super admin, 2026-27, transcript catalog)
-app/Commands/                   gap:import, gap:year, gap:volunteer-status, gap:import-schedule (spark commands)
+app/Commands/                   gap:import, gap:year, gap:volunteer-status, gap:import-schedule, gap:import-applicants
 app/Helpers/gap_helper.php      current_year(), money(), letter_for(), ...
 tools/excel_to_json.py          Excel → JSON for the importer
 tools/map_to_json.py            class map tab → JSON for gap:import-schedule
+tools/applicants_to_json.py     applicant tabs + rubric → JSON for gap:import-applicants
 public/img/gap-logo.png         logo used on the transcript
 ```
 
@@ -180,12 +195,14 @@ public/img/gap-logo.png         logo used on the transcript
 `volunteers` (one per adult, not per year) → `volunteer_roles` (role, life-skills category, is_lead).
 `students.mentor_id` points at a volunteer. `host_homes` belong to a program year and link their people
 through `host_home_people` → `volunteers`. `transcript_courses` is the per-year catalog.
+`applicants` (per year; `student_id` once accepted, `prior_applicant_id` for re-applicants) → `applicant_steps`
+(checklist: step, done, done_on, note) and `applicant_scores` (rubric: user_id or imported scorer_name, category, score).
 `courses` (cross-year) → `course_staff` (volunteer + role), `course_assets`. Per year: `schedule_slots`,
 `schedule_blocks`, `schedule_recurrences` (standing week) and `schedule_entries` (one session per row,
 `slot_id` null = all day, `recurrence_id` set when generated) → `entry_staff`. `program_years.week_one_starts`
 gives the GAP week numbers.
 `group_sets` → `groups` → `group_members` hold the team / Friday night / accountability groupings.
-`notes` is polymorphic (`subject_type` student|host_home|volunteer|course + `subject_id`), with `noted_on` (date), optional
+`notes` is polymorphic (`subject_type` student|host_home|volunteer|course|applicant + `subject_id`), with `noted_on` (date), optional
 `noted_time`, `category`, `user_id` and an `author_name` snapshot.
 `users` + `user_areas` is the login allowlist. All Moodle references are plain integer ids
 (`moodle_userid`, `moodle_course_id`, `moodle_overall_course_id`).

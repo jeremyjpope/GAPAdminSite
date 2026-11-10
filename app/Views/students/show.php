@@ -2,6 +2,7 @@
 <?php use App\Libraries\Auth; ?>
 <?= $this->section('actions') ?>
 <div class="d-flex gap-2">
+ <?php if (! empty($applicant) && \App\Libraries\Auth::can('applicants')): ?><a class="btn btn-sm btn-outline-secondary" href="<?= site_url('applicants/' . $applicant['id']) ?>"><i class="bi bi-person-plus"></i> Application</a><?php endif ?>
   <?php if (Auth::can('transcripts')): ?><a class="btn btn-sm btn-outline-secondary" href="<?= site_url('transcripts/' . $s['id']) ?>"><i class="bi bi-file-earmark-text"></i> Transcript</a><?php endif ?>
   <?php if (Auth::can('tuition')): ?><a class="btn btn-sm btn-outline-secondary" href="<?= site_url('tuition/' . $s['id']) ?>"><i class="bi bi-cash-coin"></i> Tuition</a><?php endif ?>
   <a class="btn btn-sm btn-outline-secondary" href="<?= site_url('students/' . $s['id'] . '/grades') ?>"><i class="bi bi-mortarboard"></i> Moodle grades</a>
