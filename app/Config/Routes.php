@@ -31,6 +31,13 @@ $routes->group('students', ['filter' => 'area:students'], static function ($r) {
     $r->get('(:num)/grades', 'Students::grades/$1');
 });
 
+$routes->group('notes', ['filter' => 'auth'], static function ($r) {   // area checked per subject in the controller
+    $r->get('(:segment)/(:num)', 'Notes::index/$1/$2');
+    $r->post('(:segment)/(:num)', 'Notes::store/$1/$2');
+    $r->post('(:segment)/(:num)/(:num)', 'Notes::update/$1/$2/$3');
+    $r->post('(:segment)/(:num)/(:num)/delete', 'Notes::delete/$1/$2/$3');
+});
+
 $routes->group('tuition', ['filter' => 'area:tuition'], static function ($r) {
     $r->get('/', 'Tuition::index');
     $r->get('(:num)', 'Tuition::student/$1');

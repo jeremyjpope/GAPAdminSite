@@ -25,6 +25,9 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 - Models are thin `CodeIgniter\Model` subclasses with `allowedFields`; add new columns there too.
 - Schema changes go in a new migration in `app/Database/Migrations/` (never edit the old ones);
   they must work on both SQLite (local) and MySQL (production).
+- Notes (`app/Controllers/Notes.php`, `app/Views/notes/_panel.php`) are polymorphic; to attach notes to a
+  new kind of record add it to `NoteModel::SUBJECTS` (subject => required area) and the `subject()`
+  loader, then include the panel view with `type`, `subjectId`, `notes`, `returnUrl`.
 - Moodle calls go through `app/Libraries/MoodleClient.php` only. The server-side token belongs
   to the *Moodle mobile web service*, which does NOT include cohort functions; prefer
   `core_enrol_get_enrolled_users`, `core_user_get_users_by_field`, `core_course_get_courses`,
@@ -71,3 +74,4 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 Applicants and interview rubric (area slug `applicants` already exists), volunteer lists,
 importing prior years' transcripts, finer Moodle→transcript mapping (one Moodle course feeding
 several transcript lines), gender-specific catalog lines (today unused lines simply don't print).
+- App timezone is America/Chicago (app/Config/App.php); note timestamps and dates use it.

@@ -20,6 +20,7 @@ Staff log in with their **Moodle username and password**. Only people listed und
 | **Students** | Directory for the current program year: contact details, parents/guardians, vehicle + VIN + oil info, medical notes, driving clearance, placement preference, photo upload, free-text notes. Link to the Moodle account and view the live Moodle gradebook. "Sync from Moodle" creates/links students from everyone enrolled as a student in the year's overall-standing course. |
 | **Tuition** | Per-student plan (year / semester / monthly, total due) and a payment ledger (date, amount, method, check #, note). Balances at a glance; post-dated checks are shown separately from money already received. |
 | **Host Homes** | Host families with contacts and addresses; assign students; see who lives where. |
+| **Notes** | Dated (optionally timed) notes on a student or a host home: strikes, discipline, parent/host contact, housing, medical, praise. Each note is signed automatically with the logged-in user and the entry time; only the author or a super admin can edit or delete it. Student notes sit on the student page; host home notes open from the journal button on each home. |
 | **Mentors** | Mentor list; assign one per student. |
 | **Groups** | Any number of "group sets" per year (presentation teams, Children's Learning Center age groups, guys' and girls' Friday night groups, accountability partners…). Each set has named groups; a student is in at most one group per set. Printable roster per set. |
 | **Transcripts** | A per-year **course catalog** (pillar, course, description, term, hours) that defines the lines on the transcript. Enter letter grades by hand or **pull course totals from Moodle** for lines mapped to a Moodle course. Generates the official transcript as a PDF (same layout as the 2022-23 transcripts). |
@@ -121,7 +122,7 @@ app/Config/Moodle.php           Moodle settings (overridden from .env)
 app/Libraries/MoodleClient.php  REST client (login, cohorts, users, grades)
 app/Libraries/Auth.php          session helper + area checks
 app/Filters/                    auth / area route filters
-app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, Mentors, Groups, Transcripts, Admin
+app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, Mentors, Groups, Notes, Transcripts, Admin
 app/Views/                      Bootstrap views; transcripts/pdf.php is the PDF template
 app/Database/Migrations/        schema (one initial migration)
 app/Database/Seeds/             InitialSeeder (super admin, 2026-27, transcript catalog)
@@ -137,5 +138,7 @@ public/img/gap-logo.png         logo used on the transcript
 `tuition_accounts` (plan + total due), `payments`, `transcript_grades`.
 `host_homes` and `mentors` belong to a program year; `transcript_courses` is the per-year catalog.
 `group_sets` → `groups` → `group_members` hold the team / Friday night / accountability groupings.
+`notes` is polymorphic (`subject_type` student|host_home + `subject_id`), with `noted_on` (date), optional
+`noted_time`, `category`, `user_id` and an `author_name` snapshot.
 `users` + `user_areas` is the login allowlist. All Moodle references are plain integer ids
 (`moodle_userid`, `moodle_course_id`, `moodle_overall_course_id`).

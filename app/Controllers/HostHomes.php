@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\HostHomeModel;
+use App\Models\NoteModel;
 use App\Models\StudentModel;
 
 class HostHomes extends BaseController
@@ -17,7 +18,9 @@ class HostHomes extends BaseController
             $byHome[$s['host_home_id'] ?: 0][] = $s;
         }
 
-        return view('housing/index', ['title' => 'Host Homes', 'year' => $year, 'homes' => $homes, 'students' => $students, 'byHome' => $byHome]);
+        $noteCounts = (new NoteModel())->countsFor('host_home', array_column($homes, 'id'));
+
+        return view('housing/index', ['title' => 'Host Homes', 'year' => $year, 'homes' => $homes, 'students' => $students, 'byHome' => $byHome, 'noteCounts' => $noteCounts]);
     }
 
     public function store()

@@ -47,6 +47,8 @@
     </dl>
   </div></div>
 
+  <div class="mb-3"><?= view('notes/_panel', ['type' => 'student', 'subjectId' => $s['id'], 'notes' => $notes, 'returnUrl' => site_url('students/' . $s['id']) . '#notes']) ?></div>
+
   <div class="row g-3">
    <div class="col-md-6"><div class="card"><div class="card-header bg-white fw-semibold">Parents &amp; contacts</div>
     <table class="table table-sm mb-0"><tbody>

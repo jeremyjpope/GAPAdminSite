@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Libraries\MoodleClient;
 use App\Models\HostHomeModel;
 use App\Models\MentorModel;
+use App\Models\NoteModel;
 use App\Models\StudentContactModel;
 use App\Models\StudentModel;
 use App\Models\StudentVehicleModel;
@@ -71,6 +72,7 @@ class Students extends BaseController
             'acct'     => $acct,
             'paid'     => $paid,
             'moodleUrl' => (new MoodleClient())->baseUrl(),
+            'notes'    => (new NoteModel())->forSubject('student', $id),
         ]);
     }
 

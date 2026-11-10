@@ -14,6 +14,7 @@
       <div class="mt-1"><?php foreach ($byHome[$h['id']] ?? [] as $s): ?><a class="badge text-bg-light text-decoration-none" href="<?= site_url('students/' . $s['id']) ?>"><?= esc(student_name($s)) ?></a> <?php endforeach ?><?= empty($byHome[$h['id']]) ? '<span class="small text-secondary">no students assigned</span>' : '' ?></div>
     </div>
     <div class="text-end text-nowrap">
+      <a class="btn btn-sm btn-outline-secondary" href="<?= site_url('notes/host_home/' . $h['id']) ?>" title="Notes"><i class="bi bi-journal-text"></i> <?= $noteCounts[$h['id']] ?? 0 ?></a>
       <button class="btn btn-sm btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#homeModal" onclick='editHome(<?= json_encode($h) ?>)'><i class="bi bi-pencil"></i></button>
       <form class="d-inline" method="post" action="<?= site_url('housing/' . $h['id'] . '/delete') ?>" onsubmit="return confirm('Remove this host home?')"><?= csrf_field() ?><button class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button></form>
     </div>
