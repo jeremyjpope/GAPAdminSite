@@ -16,6 +16,9 @@
 <div class="modal fade" id="uModal"><div class="modal-dialog"><form class="modal-content" method="post" action="<?= site_url('admin/users') ?>" id="uForm"><?= csrf_field() ?><input type="hidden" name="id">
  <div class="modal-header"><h5 class="modal-title">Site access</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
  <div class="modal-body">
+  <div class="mb-3 p-2 bg-light rounded border"><label class="form-label small mb-1"><i class="bi bi-search"></i> Find in Moodle</label>
+   <input class="form-control form-control-sm" id="mq" placeholder="Type a name or email… (blank = staff on the overall course)" autocomplete="off">
+   <div id="mres" class="list-group list-group-flush small mt-1" style="max-height:11rem;overflow:auto"></div></div>
   <div class="mb-2"><label class="form-label">Full name</label><input class="form-control" name="fullname" required></div>
   <div class="row g-2 mb-2"><div class="col-6"><label class="form-label">Moodle username</label><input class="form-control" name="username"></div><div class="col-6"><label class="form-label">Moodle email</label><input class="form-control" name="email"></div></div>
   <div class="mb-3"><label class="form-label">Moodle user id (optional)</label><input class="form-control" name="moodle_userid"></div>
@@ -27,5 +30,17 @@
  </div><div class="modal-footer"><button class="btn btn-dark">Save</button></div></form></div></div>
 <script>function editU(u){const f=document.getElementById('uForm');for(const k of ['id','fullname','username','email','moodle_userid'])f.elements[k].value=u?(u[k]??''):'';
  f.querySelectorAll('input[name="areas[]"]').forEach(c=>c.checked=!!(u&&u.areas.includes(c.value)));
- if(f.elements['is_superadmin'])f.elements['is_superadmin'].checked=!!(u&&+u.is_superadmin);f.elements['is_active'].checked=u?!!+u.is_active:true;}</script>
+ if(f.elements['is_superadmin'])f.elements['is_superadmin'].checked=!!(u&&+u.is_superadmin);f.elements['is_active'].checked=u?!!+u.is_active:true;
+ document.getElementById('mq').value='';document.getElementById('mres').innerHTML='';if(!u)mSearch('');}
+let mTimer=null;
+async function mSearch(q){const box=document.getElementById('mres');box.innerHTML='<div class="list-group-item text-secondary">Searching Moodle…</div>';
+ try{const r=await fetch('<?= site_url('admin/moodle-users') ?>?q='+encodeURIComponent(q));const d=await r.json();
+  if(d.error){box.innerHTML='<div class="list-group-item text-danger">'+d.error+'</div>';return;}
+  if(!d.users.length){box.innerHTML='<div class="list-group-item text-secondary">No matches.</div>';return;}
+  box.innerHTML='';for(const u of d.users){const a=document.createElement('a');a.href='#';a.className='list-group-item list-group-item-action py-1';
+   a.innerHTML='<b></b> <span class="text-secondary"></span>';a.querySelector('b').textContent=u.fullname;a.querySelector('span').textContent=(u.username||'')+(u.email?' · '+u.email:'')+(u.roles?' · '+u.roles:'');
+   a.onclick=e=>{e.preventDefault();const f=document.getElementById('uForm');f.elements['fullname'].value=u.fullname;f.elements['username'].value=u.username||'';f.elements['email'].value=u.email||'';f.elements['moodle_userid'].value=u.id;box.innerHTML='';document.getElementById('mq').value=u.fullname;};
+   box.appendChild(a);}
+ }catch(e){box.innerHTML='<div class="list-group-item text-danger">Moodle did not answer.</div>';}}
+document.getElementById('mq').addEventListener('input',e=>{clearTimeout(mTimer);const q=e.target.value.trim();mTimer=setTimeout(()=>mSearch(q),q?350:0);});</script>
 <?= $this->endSection() ?>

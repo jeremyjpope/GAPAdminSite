@@ -144,4 +144,5 @@ $routes->group('admin', ['filter' => 'area:admin'], static function ($r) {
     $r->get('years', 'Admin::years');
     $r->post('years', 'Admin::saveYear');
     $r->get('moodle', 'Admin::moodle');
+    $r->get('moodle-users', 'Admin::moodleUsers');
 });

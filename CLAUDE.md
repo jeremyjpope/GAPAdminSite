@@ -40,7 +40,9 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
   `schedule_entry_hours()`); all-day entries count 0. GAP week numbers come from
   `program_years.week_one_starts`. Course assets upload to `writable/uploads/courses/<id>/`.
 - Moodle calls go through `app/Libraries/MoodleClient.php` only. The server-side token belongs
-  to the *Moodle mobile web service*, which does NOT include cohort functions; prefer
+  to the *Moodle mobile web service*, which does NOT include cohort functions; the site-wide user search
+  (`core_user_get_users`, `core_user_search_identity`) is blocked too, but `core_enrol_search_users`
+  scoped to the overall course searches every account and is allowed; prefer
   `core_enrol_get_enrolled_users`, `core_user_get_users_by_field`, `core_course_get_courses`,
   `gradereport_user_get_grade_items`, `gradereport_overview_get_course_grades`.
 - Moodle facts (2026-27): overall-standing course id 10 rolls up each class via mod_subcourse;

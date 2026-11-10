@@ -132,6 +132,42 @@ class MoodleClient
         return $out;
     }
 
+    /**
+     * Search Moodle accounts by name or email. The mobile service blocks the site-wide user search,
+     * but core_enrol_search_users (the "enrol users" dialog of a course) searches every account and
+     * is allowed, so it is scoped to a course the token can see. Returns id, username, email, fullname.
+     */
+    public function searchUsers(string $query, int $courseId, int $limit = 15): array
+    {
+        $rows = $this->call('core_enrol_search_users', ['courseid' => $courseId, 'search' => $query, 'searchanywhere' => true, 'page' => 0, 'perpage' => $limit]);
+        $ids  = array_map(static fn ($u) => (int) $u['id'], $rows);
+        if (! $ids) {
+            return [];
+        }
+        // the search result carries no username/email; fetch them by id (allowed for the mobile service)
+        $out = [];
+        foreach ($this->call('core_user_get_users_by_field', ['field' => 'id', 'values' => $ids]) as $u) {
+            $out[] = ['id' => (int) $u['id'], 'username' => $u['username'] ?? '', 'email' => $u['email'] ?? '', 'fullname' => $u['fullname'] ?? trim(($u['firstname'] ?? '') . ' ' . ($u['lastname'] ?? ''))];
+        }
+        usort($out, static fn ($a, $b) => strcmp($a['fullname'], $b['fullname']));
+
+        return $out;
+    }
+
+    /** Non-student people enrolled in a course (the leadership team on the overall-standing course), with their role names. */
+    public function courseStaff(int $courseId): array
+    {
+        $out = [];
+        foreach ($this->call('core_enrol_get_enrolled_users', ['courseid' => $courseId]) as $u) {
+            $roles = array_unique(array_column($u['roles'] ?? [], 'shortname'));
+            if ($roles && ! in_array('student', $roles, true)) {
+                $out[] = ['id' => (int) $u['id'], 'username' => $u['username'] ?? '', 'email' => $u['email'] ?? '', 'fullname' => $u['fullname'], 'roles' => implode(', ', $roles)];
+            }
+        }
+
+        return $out;
+    }
+
     /** All courses (id, fullname, shortname, categoryid). */
     public function courses(): array
     {

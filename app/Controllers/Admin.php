@@ -100,6 +100,40 @@ class Admin extends BaseController
     }
 
     /** Moodle connection check. */
+    /** JSON for the Access page's Moodle picker: ?q=name searches all accounts; no q lists the overall course's staff. */
+    public function moodleUsers()
+    {
+        $c = new MoodleClient();
+        $q = trim((string) $this->request->getGet('q'));
+        if (! $c->hasServiceToken()) {
+            return $this->response->setJSON(['error' => 'No Moodle service token configured.']);
+        }
+        $course = (int) (current_year()['moodle_overall_course_id'] ?? 0);
+        if (! $course) {
+            foreach (all_years() as $y) {
+                if ($y['moodle_overall_course_id']) {
+                    $course = (int) $y['moodle_overall_course_id'];
+                    break;
+                }
+            }
+        }
+        if (! $course) {
+            return $this->response->setJSON(['error' => 'Set the Moodle overall-standing course id on a program year first.']);
+        }
+        try {
+            if ($q === '') {
+                $users = $c->courseStaff($course);
+            } else {
+                $students = array_map(static fn ($u) => (int) $u['id'], $c->enrolledStudents($course));
+                $users    = array_values(array_filter($c->searchUsers($q, $course), static fn ($u) => ! in_array($u['id'], $students, true)));
+            }
+        } catch (RuntimeException $e) {
+            return $this->response->setJSON(['error' => $e->getMessage()]);
+        }
+
+        return $this->response->setJSON(['users' => $users]);
+    }
+
     public function moodle()
     {
         $c = new MoodleClient();
