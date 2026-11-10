@@ -65,6 +65,33 @@ def cell(r, i):
     return s(r[i]) if i is not None and i < len(r) else ''
 
 
+def header_all(row_vals):
+    """norm(header) -> [indexes] for a header row (handles repeated headers like two 'Email' columns)."""
+    out = {}
+    for i, v in enumerate(row_vals):
+        if s(v):
+            out.setdefault(norm(v), []).append(i)
+    return out
+
+
+def find_sheet(wb, *patterns, exclude=r'copy of'):
+    for pat in patterns:
+        for n in wb.sheetnames:
+            if re.search(pat, n, re.I) and not re.search(exclude, n, re.I):
+                return n
+    return None
+
+
+ROLE_ALIASES = {'leadership': 'Leadership Team/Advisory', 'leadership team': 'Leadership Team/Advisory',
+                'mentor': 'Guys Mentor', 'host home': 'Host Family', 'host': 'Host Family', 'sub host family': 'Sub Host Family',
+                'career': 'Career Moment', 'special topics': 'Special Topic', 'meal': 'Meal Provider'}
+
+
+def norm_role(role):
+    r = role.strip()
+    return ROLE_ALIASES.get(r.lower(), r)
+
+
 def split_person(name):
     """'Jeff St. Romain' -> ('Jeff', 'St. Romain'); 'Evan Midgette Sr.' -> ('Evan', 'Midgette Sr.'); strips Dr./Mr."""
     toks = [t for t in re.sub(r'\s+', ' ', name.replace('"', ' ')).strip().split(' ') if t]
@@ -77,7 +104,7 @@ def split_person(name):
     last = toks.pop()
     if toks and last.rstrip('.').lower() in ('sr', 'jr', 'ii', 'iii'):
         last = toks.pop() + ' ' + last
-    if toks and (toks[-1] in TITLES or (toks[-1].endswith('.') and len(toks) > 1)):
+    if len(toks) > 1 and (toks[-1] in TITLES or toks[-1].endswith('.')):
         last = toks.pop() + ' ' + last
     return ' '.join(toks), last
 
@@ -186,24 +213,163 @@ def main(xlsx, out, label=None):
             warnings.append(f'Could not match "{raw}" to a student' + (' (ambiguous)' if len(cands) > 1 else ''))
         return None
 
-    # 1. Roster: a roster sheet if present, else everyone named in Host Home Assignments + Mentor Information.
+    # 1. Roster. Sources, in order: a roster sheet; group-list sheets (Group | First | Last ...);
+    #    a "2019 Students"-style sheet; a "Guy Directory"; else names in the housing + mentor sheets.
+    group_list_sets = []     # [(set name, {group: [names]})] collected from group-list sheets
+    hh_sheet = find_sheet(wb, r'^host home assignments$', r'^host homes?$', r'^host home information$')
+    mentor_sheet = find_sheet(wb, r'^mentor information$')
+
     if 'Student Names & Email Addresses' in wb.sheetnames:
         for r in wb['Student Names & Email Addresses'].iter_rows(values_only=True):
             first, last, email = s(r[0]), s(r[1]), s(r[2])
             if first and last:
                 new_student(first, last, email)
-    else:
-        if 'Host Home Assignments' in wb.sheetnames:
-            for r in wb['Host Home Assignments'].iter_rows(values_only=True):
+
+    def set_name_for(labels):
+        prefixes = {re.sub(r'[\s/]*(\b[A-D]\b(/[A-D])?|\d+)\s*$', '', l.replace('\n', ' ')).strip().lower() for l in labels}
+        prefixes.discard('')
+        if len(prefixes) == 1:
+            pfx = prefixes.pop()
+            return {'pres': 'Team Presentation Groups', 'coed': 'Coed Groups', 'girls': 'Girls Groups',
+                    'guys': 'Guys Groups', 'boys': 'Guys Groups', 'group': 'Student Groups'}.get(pfx, pfx.title() + ' Groups')
+        return 'Student Groups'
+
+    for gl_name in [n for n in wb.sheetnames if re.search(r'groups$', n, re.I) and not re.search(r'groups ?teams', n, re.I)]:
+        ws = wb[gl_name]
+        rows = [[s(v) for v in r] for r in ws.iter_rows(values_only=True)]
+        hdr = None
+        blocks, cur_block, cur_group = [], None, None
+        for r in rows:
+            if not any(r):
+                if cur_block:
+                    blocks.append(cur_block); cur_block = None
+                continue
+            if r[0].lower() == 'group' and any(x.lower() in ('first', 'name', 'first name') for x in r):
+                hdr = header_all(r)
+                if cur_block:
+                    blocks.append(cur_block)
+                cur_block, cur_group = {'groups': {}, 'hdr': hdr}, None
+                continue
+            if not hdr:
+                continue
+            if cur_block is None:
+                cur_block, cur_group = {'groups': {}, 'hdr': hdr}, None
+            def c(*names):
+                for n in names:
+                    if norm(n) in hdr:
+                        return r[hdr[norm(n)][0]] if hdr[norm(n)][0] < len(r) else ''
+                return ''
+            g = r[0].replace('\n', ' ').strip()
+            if g:
+                cur_group = g
+            if norm('first') in hdr or norm('first name') in hdr:
+                first, last = c('First', 'First Name'), c('Last', 'Last Name')
+                full = f'{first} {last}'.strip()
+            else:
+                full = re.sub(r'^\(\*?[A-D]\)\s*', '', c('Name')).strip()
+            if not full or len(full.split()) < 2 or cur_group is None:
+                continue
+            st = find(full, create=not blocks, quiet=True)      # only the first block may add roster names
+            if not st:
+                continue
+            email, phone = c('Email').lower(), c('Phone Number', 'Phone')
+            st['email'] = st['email'] or email
+            st['phone'] = st['phone'] or phone
+            st['address'] = st['address'] or c('HomeTown')
+            hh = c('Host Home')
+            if hh and hh.lower() not in ('home', 'rental', 'parent', 'parents', 'parent/grandparent', 'tbd', 'n/a'):
+                st.setdefault('_hh_text', hh)
+            elif hh:
+                st['_at_home'] = True
+            m_ = c('Student Mentor', 'Mentor')
+            if m_:
+                st['mentor'] = st['mentor'] or m_
+            sponsor = c('Host Home Sponsor')
+            if sponsor:
+                st['notes'].append('Host home sponsor: ' + sponsor)
+            cur_block['groups'].setdefault(cur_group, []).append(f"{st['first_name']} {st['last_name']}")
+        if cur_block:
+            blocks.append(cur_block)
+        for b in blocks:
+            if b['groups'] and sum(len(v) for v in b['groups'].values()) >= 2:
+                nm = set_name_for(list(b['groups'].keys()))
+                existing = next((g for n_, g in group_list_sets if n_ == nm), None)
+                if existing is not None:
+                    for k, v in b['groups'].items():
+                        existing.setdefault(k, []).extend(x for x in v if x not in existing.get(k, []))
+                else:
+                    group_list_sets.append((nm, b['groups']))
+
+    students_sheet = find_sheet(wb, r'^\d{4} students$')
+    if students_sheet:
+        ws = wb[students_sheet]
+        hm = header_map(ws)
+        c_name, c_email, c_cell = col(hm, 'GAP Student Name', 'Student Name', 'Name'), col(hm, 'Email'), col(hm, 'Cell', 'Phone')
+        c_par, c_paremail = col(hm, 'Parents'), col(hm, "Parent's Email")
+        c_paid = next((i for h, i in hm.items() if h.startswith('datepaid')), None)
+        paid_hdr = next((s(c_.value) for c_ in ws[1] if norm(c_.value).startswith('datepaid')), '')
+        tuition_total = float(re.sub(r'[^\d.]', '', paid_hdr) or 0) or None
+        for r in ws.iter_rows(min_row=2, values_only=True):
+            full = cell(r, c_name)
+            if not full or len(full.split()) < 2:
+                continue
+            first, last = split_person(full)
+            st = new_student(first, last, cell(r, c_email))
+            st['phone'] = cell(r, c_cell)
+            par = cell(r, c_par)
+            if par and not par.lower().startswith('friend'):
+                pfirst_parts = [x.strip() for x in re.split(r'\s*(?:&|\band\b)\s*', par) if x.strip()]
+                plast = split_person(pfirst_parts[-1])[1] if pfirst_parts else ''
+                for i, pp in enumerate(pfirst_parts):
+                    f_, l_ = split_person(pp)
+                    st['contacts'].append(dict(name=f'{f_} {l_ or plast}'.strip(), email=cell(r, c_paremail) if i == 0 else '', phone='', relation='Parent'))
+            elif par:
+                st['contacts'].append(dict(name=par, email=cell(r, c_paremail), phone='', relation='Emergency'))
+            paid = cell(r, c_paid)
+            if tuition_total:
+                pays = []
+                if re.match(r'\d{4}-\d\d-\d\d', paid):
+                    pays.append(dict(paid_on=paid[:10], amount=tuition_total, method='other', reference='', note='Imported: ' + paid_hdr))
+                st['tuition'] = dict(plan_type='year', total_due=tuition_total, notes=(paid_hdr + ': ' + paid) if paid else '', payments=pays)
+                if paid and not pays:
+                    st['notes'].append(paid_hdr + ': ' + paid)
+
+    directory = find_sheet(wb, r'guy directory$', r'girl directory$')
+    if directory and not students:
+        ws = wb[directory]
+        gender = 'M' if 'guy' in directory.lower() else 'F'
+        hm = None
+        for r in ws.iter_rows(values_only=True):
+            vals = [s(v) for v in r]
+            if hm is None:
+                if 'name' in [v.lower() for v in vals]:
+                    hm = header_all(vals)
+                continue
+            full = vals[hm['name'][0]] if 'name' in hm else ''
+            if not full or len(full.split()) < 2:
+                continue
+            first, last = split_person(full)
+            st = new_student(first, last, vals[hm['email'][0]] if 'email' in hm else '')
+            st['gender'] = gender
+            st['phone'] = vals[hm['phone'][0]] if 'phone' in hm else ''
+            st['address'] = (vals[hm['homeaddress'][0]] if 'homeaddress' in hm else '').replace('\n', ', ')
+            bd = vals[hm['birthday'][0]] if 'birthday' in hm else ''
+            st['birthday'] = bd[:10] if re.match(r'\d{4}-\d\d-\d\d', bd) else None
+
+    if not students:
+        if hh_sheet:
+            for r in wb[hh_sheet].iter_rows(values_only=True):
                 a, b = s(r[0]), s(r[1])
                 if a and '@' in b and a not in ('Name', 'Student'):
                     st = find(a, create=True, quiet=True)
                     if st and not st['email']:
                         st['email'] = b.lower()
-        if 'Mentor Information' in wb.sheetnames:
-            for r in wb['Mentor Information'].iter_rows(values_only=True):
-                a, b = s(r[0]), s(r[1])
-                if a and b and a != 'Student' and not a.isupper():
+        if mentor_sheet:
+            for r in wb[mentor_sheet].iter_rows(values_only=True):
+                a, b, c3 = s(r[0]), s(r[1]), s(r[2])
+                if a == 'Timeslot' or b == 'Position':
+                    break
+                if a and b and '@' in c3 and a != 'Student' and not a.isupper() and len(a.split()) >= 2:
                     find(a, create=True, quiet=True)
 
     # 2. Applicant details ("Applicants" with GUY/GIRL sections, or "Guys" + "Girls" tabs)
@@ -213,7 +379,8 @@ def main(xlsx, out, label=None):
         if c_first is None or c_last is None:
             return
         c = dict(email=col(hm, 'Email Address', 'Email'), phone=col(hm, 'Phone Number', 'Phone'),
-                 address=col(hm, 'Address', 'Hometown Address'), tuition=col(hm, 'Yearly Tuition', 'Tuition Payment'),
+                 address=col(hm, 'Address', 'Hometown Address', 'Home Address', 'HomeTown'),
+                 tuition=col(hm, 'Yearly Tuition', 'Tuition Payment', 'Spring Tuition Paid'),
                  tshirt=col(hm, 'T-Shirt Size'), place=col(hm, 'Preschool or Elementary Preference', 'Church Serving Preference'),
                  mom=col(hm, "Mom's Email"), dad=col(hm, "Dad's Email"), birthday=col(hm, 'Birthday'),
                  medical=col(hm, 'Allergies?/Medical notes', 'Allergies?'), drive=col(hm, 'Cleared to Drive'),
@@ -266,7 +433,7 @@ def main(xlsx, out, label=None):
                 if ins and key == 'insurance' or (ins and 'insur' in ins.lower()):
                     st['auto_insurance'] = st['auto_insurance'] or ins
             tuition = cell(r, c['tuition'])
-            if tuition:
+            if tuition and not st['tuition']:
                 if re.fullmatch(r'\d+(\.\d+)?', tuition):
                     st['_tuition_amount'] = float(tuition)
                 else:
@@ -279,10 +446,12 @@ def main(xlsx, out, label=None):
             if n:
                 st['notes'].append(n)
 
-    if 'Applicants' in wb.sheetnames:
-        apply_applicants(wb['Applicants'])
-    for tab, g in (('Guys', 'M'), ('Girls', 'F')):
-        if tab in wb.sheetnames:
+    app_tab = find_sheet(wb, r'applicants$')
+    if app_tab:
+        apply_applicants(wb[app_tab])
+    for pat, g in ((r'(^|\s)guys?$', 'M'), (r'(^|\s)girls?$', 'F')):
+        tab = find_sheet(wb, pat)
+        if tab:
             apply_applicants(wb[tab], g)
 
     # 3. Vehicles sheet (Year 8)
@@ -295,15 +464,26 @@ def main(xlsx, out, label=None):
 
     # 4. Mentors
     mentors = {}
+    mentor_positions = {}   # name -> position text (older workbooks)
     gender = ''
-    if 'Mentor Information' in wb.sheetnames:
-        for r in wb['Mentor Information'].iter_rows(values_only=True):
+    if mentor_sheet:
+        layout = None
+        for r in wb[mentor_sheet].iter_rows(values_only=True):
             a, b, c3 = s(r[0]), s(r[1]), s(r[2])
             up = a.upper()
             if 'PREVIOUS' in up:
                 break
-            if up == a and ('GUYS' in up or 'GIRLS' in up):
-                gender = 'M' if 'GUYS' in up else 'F'
+            if re.search(r"guys'? mentors|girls'? mentors", a, re.I) or (up == a and ('GUYS' in up or 'GIRLS' in up)):
+                gender = 'M' if 'GUY' in up else 'F'
+                continue
+            if a == 'Timeslot' or b == 'Position':
+                layout = 'positions'; continue
+            if layout == 'positions':
+                first, last, email = s(r[2]), s(r[3]), s(r[4])
+                if first and last:
+                    nm = f'{first} {last}'
+                    mentors.setdefault(nm, dict(name=nm, email=email if '@' in email else '', gender=gender))
+                    mentor_positions[nm] = b
                 continue
             if a == 'Student' or not a or not b:
                 continue
@@ -315,66 +495,182 @@ def main(xlsx, out, label=None):
             if st:
                 st['mentor'] = b
 
-    # 5. Host homes + parents
+    # 5. Host homes + parents (header-driven: each section starts with a header row)
     homes = {}
-    if 'Host Home Assignments' in wb.sheetnames:
-        ws = wb['Host Home Assignments']
-        section, current, last_home = 'HOST', None, None
-        for r in ws.iter_rows(min_row=5, values_only=True):
-            a, b, c3, d, e, f, g, h, i, j, k, l = (s(x) for x in list(r[:12]) + [''] * (12 - len(r[:12])))
+    if hh_sheet:
+        ws = wb[hh_sheet]
+        section, current, last_home, hdr = 'HOST', None, None, None
+        started = not re.search(r'potential host families', s(ws['A1'].value) + s(ws['B1'].value), re.I)
+
+        def hget(r, *names, nth=0):
+            for n in names:
+                k = norm(n)
+                if k in hdr and len(hdr[k]) > nth:
+                    i = hdr[k][nth]
+                    return s(r[i]) if i < len(r) else ''
+            return ''
+
+        for r in ws.iter_rows(values_only=True):
+            vals = [s(v) for v in r]
+            a = vals[0] if vals else ''
             up = a.upper()
+            low = [v.lower() for v in vals]
+            if a.lower() in ('student', 'name', 'gap student', 'student assignment', '#') and ('email' in low or 'host home email' in low or 'name' in low[1:]):
+                hdr = header_all(vals); started = True; current = None; continue
+            if not started:
+                if re.search(r'student housing arrangements|committed host home', ' '.join(vals), re.I):
+                    started = True
+                continue
             if up.startswith('LIVING AT HOME'):
                 section, current, last_home = 'HOME', None, None; continue
             if up.startswith('STUDENT ACQUIRED'):
                 section, current, last_home = 'OWN', None, None; continue
-            if up.startswith(('FRIDAY MEAL', 'SUB HOST', 'POTENTIAL')):
+            if up.startswith(('FRIDAY MEAL', 'SUB HOST', 'POTENTIAL', 'WEEKLY FAMILY', 'CURRENT HOST')) or re.search(r'sub host|potential host', ' '.join(vals[:3]), re.I):
                 break
-            if a in ('Name', 'Student') or (not a and not e and not h and not j):
+            if hdr is None or not any(vals):
                 continue
-            if h and (h.lower().startswith('requested') or h.lower() in ('host home (hh)', "host's names")):
-                h = ''
-            if a and '@' in b:
-                current = find(a)
-                if not current:
-                    continue
-                current['email'] = current['email'] or b.lower()
-                current['phone'] = current['phone'] or c3
-                current['address'] = current['address'] or d.replace('\n', ', ')
-                if l:
-                    current['mentor'] = current['mentor'] or l
+            if 'studentassignment' in hdr:
+                stu_txt, host_txt = hget(r, 'Student Assignment'), hget(r, 'Name')
+                hh_addr, hh_email, hh_phone, mentor_txt = hget(r, 'Address'), hget(r, 'Email'), hget(r, 'Phone'), ''
+                par_names = par_emails = par_phones = stu_email = stu_phone = home_addr = ''
+            elif 'gapstudent' in hdr:
+                stu_txt, host_txt = hget(r, 'GAP Student'), hget(r, 'Host Homes')
+                hh_addr, hh_email, hh_phone, mentor_txt = hget(r, 'Host Home Address'), hget(r, 'Host Home Email'), hget(r, 'Cell Phone'), ''
+                par_names = par_emails = par_phones = stu_email = stu_phone = home_addr = ''
+            else:
+                stu_txt = hget(r, 'Student', 'Name')
+                stu_email, stu_phone = hget(r, 'Email'), hget(r, 'Phone')
+                home_addr = hget(r, 'Home Address')
+                par_names, par_emails, par_phones = hget(r, "Parent's Names"), hget(r, "Parent's Emails"), hget(r, "Parent's Phones")
+                host_txt = hget(r, 'Host Home (HH)', "Host's Names", 'Host Family', 'Host Home')
+                hh_addr = hget(r, 'HH Address', "Host's Address", 'Address')
+                csz = hget(r, 'HH CSZ', 'CSZ')
+                if csz:
+                    hh_addr = (hh_addr + ', ' + csz).strip(', ')
+                hh_email = hget(r, 'HH Email', "Host's Email") or (hget(r, 'Email', nth=1) if len(hdr.get('email', [])) > 1 else '')
+                hh_phone = hget(r, 'HH Phone', "Host's Phone") or (hget(r, 'Phone', nth=1) if len(hdr.get('phone', [])) > 1 else '')
+                mentor_txt = hget(r, 'Mentor', 'Student Mentor')
+                if not par_emails:
+                    par_emails = hget(r, "Dad's Email")
+                    mom_email = hget(r, "Mom's Email")
+                    mom_phone, dad_phone = hget(r, "Mom's Cell Phone"), hget(r, "Dad's Cell Phone")
+                else:
+                    mom_email = mom_phone = dad_phone = ''
+            if host_txt and (host_txt.lower().startswith('requested') or host_txt.lower() in ('host home (hh)', "host's names", 'home', 'tbd')):
+                host_txt = ''
+            is_student_row = bool(stu_txt) and not stu_txt.lower().startswith('mentor:') and not stu_txt.lower() in ('substitute', 'spring semester availability')
+            if is_student_row and (stu_email or 'studentassignment' in hdr or 'gapstudent' in hdr):
+                names = [x.strip() for x in re.split(r'\s*(?:&|\band\b)\s*', re.sub(r'\(.*?\)', '', stu_txt)) if x.strip()]
+                found = [find(n, quiet=True) for n in names]
+                found = [f for f in found if f]
+                if not found and stu_email:
+                    st_ = find(stu_txt, create=True, quiet=True)
+                    found = [st_] if st_ else []
+                if not found:
+                    current = None; continue
+                current = found[0]
+                for stx in found:
+                    stx['email'] = stx['email'] or stu_email.lower()
+                    stx['phone'] = stx['phone'] or stu_phone
+                    stx['address'] = stx['address'] or home_addr.replace('\n', ', ')
+                    if mentor_txt:
+                        stx['mentor'] = stx['mentor'] or mentor_txt
+                    if par_names:
+                        pp = [x.strip() for x in re.split(r'\s*(?:&|\band\b)\s*', par_names) if x.strip()]
+                        plast = split_person(pp[-1])[1] if pp else ''
+                        for i_, nm in enumerate(pp):
+                            f_, l_ = split_person(nm)
+                            stx['contacts'].append(dict(name=f'{f_} {l_ or plast}'.strip(), email=(par_emails if i_ == 0 else (mom_email if 'momsemail' in hdr else '')), phone=(par_phones if i_ == 0 else '')))
+                    if 'momsemail' in hdr and mom_email and not any(c_['email'] == mom_email for c_ in stx['contacts']):
+                        stx['contacts'].append(dict(name='', email=mom_email, phone=mom_phone))
                 if section == 'HOME':
-                    current['host_home'], last_home = None, None
-                elif h or (section == 'HOST' and last_home and j):
-                    if h:
-                        clean = re.sub(r'^\s*renting\s+from\s+', '', h, flags=re.I).strip()
-                        note = '' if section == 'HOST' else ('Student-acquired home (renting)' if clean != h else 'Student-acquired home')
-                        homes.setdefault(clean, dict(key=clean, family_name=clean, address=i.replace('\n', ', ').split(', , ')[0], notes=note,
-                                                    contacts=[]))
-                        last_home = clean
-                    home = homes[last_home]
-                    home['contacts'].append(dict(email=j, phone=k))
-                    current['host_home'] = last_home
-                if e:
-                    current['contacts'].append(dict(name=e, email=f, phone=g))
-            elif current:
-                if e:
-                    current['contacts'].append(dict(name=e, email=f, phone=g))
-                if not current['host_home'] and h and section == 'OWN':
-                    homes.setdefault(h, dict(key=h, family_name=h, address=i.replace('\n', ', '), notes='Student-acquired home', contacts=[]))
-                    current['host_home'] = h
-                    homes[h]['contacts'].append(dict(email=j, phone=k))
+                    current['host_home'] = None; last_home = None
                     continue
-                if current['host_home'] and (h or j or k):
-                    home = homes[current['host_home']]
-                    if h and section == 'OWN' and h not in home['family_name']:
-                        home['family_name'] += ' & ' + h
-                        home['key'] = home['family_name']
-                        homes[home['key']] = homes.pop(current['host_home'])
-                        for stx in students.values():
-                            if stx['host_home'] == current['host_home']:
-                                stx['host_home'] = home['key']
-                        last_home = home['key']
-                    home['contacts'].append(dict(email=j, phone=k))
+                if host_txt and all(norm(split_person(host_txt.split('&')[-1].strip())[1]) == norm(stx['last_name']) for stx in found) and section != 'OWN':
+                    for stx in found:
+                        stx['notes'].append('Living with family: ' + host_txt)
+                    host_txt = ''
+                    last_home = None
+                if host_txt and all(stx.get('_at_home') for stx in found):
+                    for stx in found:
+                        stx['notes'].append('Sponsor / meal family: ' + host_txt)
+                    last_home = None
+                    continue
+                if host_txt and all(stx['host_home'] for stx in found):
+                    current = None
+                    for stx in found:
+                        stx['notes'].append('Also housed with ' + host_txt + (' (' + re.sub(r'[()]', '', re.search(r'\(.*?\)', s(r[hdr.get('gapstudent', hdr.get('student', [0]))[0]])).group(0)) + ')' if re.search(r'\(.*?\)', s(r[hdr.get('gapstudent', hdr.get('student', [0]))[0]])) else ''))
+                    continue
+                if host_txt or (section == 'HOST' and last_home and hh_email):
+                    if host_txt:
+                        clean = re.sub(r'^\s*renting\s+from\s+', '', host_txt, flags=re.I).strip()
+                        same = last_home and not hh_addr and (homes[last_home]['_last'] == split_person(clean)[1] or hh_email and hh_email.lower() in [c_['email'].lower() for c_ in homes[last_home]['contacts']])
+                        if same:
+                            if clean not in homes[last_home]['family_name']:
+                                homes[last_home]['family_name'] += ' & ' + clean
+                        else:
+                            note = '' if section == 'HOST' else ('Student-acquired home (renting)' if clean != host_txt else 'Student-acquired home')
+                            homes.setdefault(clean, dict(key=clean, family_name=clean, address=hh_addr.replace('\n', ', ').split(', , ')[0], notes=note, contacts=[], _last=split_person(clean)[1]))
+                            last_home = clean
+                    home = homes[last_home]
+                    home['contacts'].append(dict(email=hh_email, phone=hh_phone))
+                    for stx in found:
+                        stx['host_home'] = last_home
+                continue
+            if stu_txt and not stu_txt.lower().startswith('mentor:'):
+                current = None          # a labelled row that is not a student (Substitute, Spring availability, ...)
+                continue
+            if current is None:
+                continue
+            if not stu_txt and host_txt and hh_addr and current['host_home'] and section != 'OWN':
+                current = None          # a new family with its own address and no student: not a spouse row
+                continue
+            # continuation row: second parent / second host contact / "Mentor: X"
+            if stu_txt.lower().startswith('mentor:'):
+                current['mentor'] = current['mentor'] or stu_txt.split(':', 1)[1].strip()
+                addr_ = home_addr or (stu_email if stu_email and '@' not in stu_email else '')
+                if addr_ and not current['address']:
+                    current['address'] = addr_.replace('\n', ', ')
+            if par_names:
+                current['contacts'].append(dict(name=par_names, email=par_emails, phone=par_phones))
+            elif par_emails or par_phones:
+                blank = next((c_ for c_ in current['contacts'] if not c_['email'] and c_.get('name')), None)
+                if blank:
+                    blank['email'], blank['phone'] = par_emails, blank['phone'] or par_phones
+                else:
+                    current['contacts'].append(dict(name='', email=par_emails, phone=par_phones))
+            if not current['host_home'] and host_txt and section == 'OWN':
+                homes.setdefault(host_txt, dict(key=host_txt, family_name=host_txt, address=hh_addr.replace('\n', ', '), notes='Student-acquired home', contacts=[], _last=split_person(host_txt)[1]))
+                current['host_home'] = host_txt
+                homes[host_txt]['contacts'].append(dict(email=hh_email, phone=hh_phone))
+                continue
+            if current['host_home'] and (host_txt or hh_email or hh_phone):
+                home = homes[current['host_home']]
+                if host_txt and (section == 'OWN' or 'studentassignment' in hdr or 'gapstudent' in hdr) and host_txt not in home['family_name']:
+                    home['family_name'] += ' & ' + host_txt
+                if hh_email or hh_phone:
+                    home['contacts'].append(dict(email=hh_email, phone=hh_phone))
+    # group-list host text for students the housing sheet did not place
+    for st in students.values():
+        txt = st.pop('_hh_text', '')
+        if txt and not st['host_home']:
+            key = next((k for k in homes if norm(split_person(k.split('/')[0])[1] or k) == norm(txt.split('/')[-1].split()[-1])), None)
+            if not key:
+                key = txt.replace('/', ' & ')
+                homes[key] = dict(key=key, family_name=key, address='', notes='', contacts=[], _last=split_person(key.split('&')[-1].strip())[1])
+            st['host_home'] = key
+    for h in homes.values():
+        h.pop('_last', None)
+    if app_tab:
+        apply_applicants(wb[app_tab])
+    for pat, g in ((r'(^|\s)guys?$', 'M'), (r'(^|\s)girls?$', 'F')):
+        tab = find_sheet(wb, pat)
+        if tab:
+            apply_applicants(wb[tab], g)
+    for st in students.values():
+        for ct in st['contacts']:
+            if not ct.get('name'):
+                ct['name'] = ct['email'] or 'Parent'
     for st in students.values():
         for ct in st['contacts']:
             em = ct['email'].lower()
@@ -437,14 +733,15 @@ def main(xlsx, out, label=None):
                     if a_ and b_:
                         housing_rates = (float(a_.group(1)), float(b_.group(1)))
     # Workbook-wide hint when there is no rate box: the usual semester amount implies the year total.
-    sem_amounts = []
+    big_amounts = []
     for st in students.values():
         txt = st.get('_tuition_text', '')
-        if txt and plan_from_text(txt) == 'semester':
-            m_ = re.search(r'\$\s?(\d[\d,]*)', txt)
-            if m_:
-                sem_amounts.append(float(m_.group(1).replace(',', '')))
-    usual_total = (max(set(sem_amounts), key=sem_amounts.count) * 2) if sem_amounts else None
+        if txt:
+            big_amounts += [float(a.replace(',', '')) for a in re.findall(r'\$\s?(\d[\d,]*)', txt) if float(a.replace(',', '')) >= 1000]
+    usual_total = None
+    if big_amounts:
+        common = max(set(big_amounts), key=big_amounts.count)
+        usual_total = common * 2 if big_amounts.count(common * 2) <= big_amounts.count(common) else common * 2
     for st in students.values():
         txt = st.pop('_tuition_text', '')
         if st['tuition'] or not txt:
@@ -551,8 +848,9 @@ def main(xlsx, out, label=None):
         if txt and txt not in v['notes']:
             v['notes'] = (v['notes'] + '\n' if v['notes'] else '') + txt
 
-    if 'Volunteer List' in wb.sheetnames:
-        ws = wb['Volunteer List']
+    vol_sheet = find_sheet(wb, r'^volunteer list$', r'^gap volunteer list$')
+    if vol_sheet:
+        ws = wb[vol_sheet]
         hm = header_map(ws)
         hdr = [s(c.value) for c in ws[1]]
         role_cols = [i for i, h in enumerate(hdr) if norm(h) == 'role']
@@ -593,10 +891,39 @@ def main(xlsx, out, label=None):
                     add_role(v, 'Meal Provider'); add_role(v, 'Guest'); continue
                 if role == 'Career Moment Guest':
                     add_role(v, 'Career Moment'); add_role(v, 'Guest'); continue
+                role = norm_role(role)
                 add_role(v, role, cat if role in ('Life Skills', 'Fitness') else '')
             if cat and not any(x['role'] in ('Life Skills', 'Fitness') for x in v['roles']):
                 add_note(v, 'Life skills category: ' + cat)
             if any(x['role'] == 'Potential Volunteer' for x in v['roles']):
+                v['status'] = 'potential'
+
+    master = find_sheet(wb, r'master volunteer list$')
+    if master and not vol_sheet:
+        ws = wb[master]
+        hm = header_map(ws)
+        flags = {'Sports/Fitness': ('Fitness', ''), 'Life Skills': ('Life Skills', ''), 'Agriculture': ('Life Skills', 'Agriculture'),
+                 'Craftsmanship': ('Life Skills', 'Artisanship'), 'Trades': ('Life Skills', 'Trades'), 'Career/Vocation': ('Career Moment', ''),
+                 'Social/Civic': ('Special Topic', ''), 'Outdoors': ('Life Skills', 'Outdoors'), 'Host Home': ('Host Family', ''),
+                 'Meal Provider': ('Meal Provider', '')}
+        fcols = {k: col(hm, k) for k in flags}
+        c = dict(first=col(hm, 'First Name'), last=col(hm, 'Last Name'), email=col(hm, 'Email'), phone=col(hm, 'Phone'), approved=col(hm, 'Approved'), other=col(hm, 'Other'))
+        for r in ws.iter_rows(min_row=2, values_only=True):
+            first, last = cell(r, c['first']), cell(r, c['last'])
+            if first and not last and len(first.split()) >= 2:
+                first, last = split_person(first)
+            if not first or not last:
+                continue
+            v = vol_get(first, last, cell(r, c['email']))
+            v['email'] = v['email'] or cell(r, c['email']).lower()
+            v['phone'] = v['phone'] or cell(r, c['phone'])
+            for k, (role, cat) in flags.items():
+                if cell(r, fcols[k]) in ('1', '1.0', 'yes', 'Yes', 'x', 'X'):
+                    add_role(v, role, cat)
+            other = cell(r, c['other'])
+            if other and other not in ('0', '0.0'):
+                add_note(v, 'Other: ' + other)
+            if cell(r, c['approved']).lower() in ('no', 'n'):
                 v['status'] = 'potential'
 
     if 'GAP 360 for Women Invitees' in wb.sheetnames:
@@ -640,6 +967,8 @@ def main(xlsx, out, label=None):
             v['email'] = v['email'] or m['email'].lower()
             v['gender'] = v['gender'] or m['gender']
             add_role(v, 'Girls Mentor' if m['gender'] == 'F' else 'Guys Mentor')
+            if mentor_positions.get(m['name']):
+                add_note(v, f"{label}: {mentor_positions[m['name']]}")
             m['name'] = f"{v['first_name']} {v['last_name']}"
     for st in students.values():
         if st['mentor']:
@@ -800,12 +1129,17 @@ def main(xlsx, out, label=None):
                     groups[cur].append(m)
             group_sets.append(dict(name=name, kind='group', group_label=glabel, groups=[dict(name=k, members=v) for k, v in groups.items()]))
 
+    for name, groups in group_list_sets:
+        if not any(g['name'] == name for g in group_sets):
+            group_sets.append(dict(name=name, kind='group', group_label='Team' if 'Presentation' in name else 'Group',
+                                   groups=[dict(name=k, members=v) for k, v in groups.items()]))
+
     # ------------------------------------------------------------------ output
     out_students = []
     for k in order:
         st = students[k]
         st['notes'] = '\n'.join(dict.fromkeys(st['notes']))
-        for drop in ('mom_email', 'dad_email', '_tuition_amount', '_tuition_text'):
+        for drop in ('mom_email', 'dad_email', '_tuition_amount', '_tuition_text', '_at_home', '_hh_text'):
             st.pop(drop, None)
         out_students.append(st)
     data = dict(label=label, students=out_students, host_homes=list(homes.values()), mentors=list(mentors.values()),

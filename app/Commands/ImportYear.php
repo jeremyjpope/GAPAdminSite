@@ -183,7 +183,12 @@ class ImportYear extends BaseCommand
             if (! empty($s['tuition'])) {
                 $t    = $s['tuition'];
                 $acct = $tm->where('student_id', $sid)->first();
-                $tf   = ['student_id' => $sid, 'plan_type' => $t['plan_type'], 'total_due' => $t['total_due'], 'notes' => $t['notes'] ?: null];
+                $total = $t['total_due'] ?? null;
+                if ($total === null && ! empty($year['tuition_year_early'])) {
+                    $total = $year['tuition_year_early'];
+                    $t['notes'] = trim(($t['notes'] ?? '') . ' [total assumed from the program year rate]');
+                }
+                $tf   = ['student_id' => $sid, 'plan_type' => $t['plan_type'], 'total_due' => $total, 'notes' => $t['notes'] ?: null];
                 $acct ? $tm->update($acct['id'], $tf) : $tm->insert($tf);
                 foreach ($t['payments'] ?? [] as $p) {
                     $dup = $pm->where('student_id', $sid)->where('paid_on', $p['paid_on'])->where('amount', $p['amount'])->where('note', $p['note'] ?: null)->first();
@@ -203,6 +208,9 @@ class ImportYear extends BaseCommand
         $byName = [];
         foreach ($sm->where('program_year_id', $yid)->findAll() as $st) {
             $byName[strtolower($st['first_name'] . ' ' . $st['last_name'])] = $st['id'];
+            if ($st['preferred_name']) {
+                $byName[strtolower($st['preferred_name'] . ' ' . $st['last_name'])] = $st['id'];
+            }
         }
         $sort = 0;
         foreach ($data['group_sets'] ?? [] as $gs) {
