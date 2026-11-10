@@ -25,6 +25,10 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 - Models are thin `CodeIgniter\Model` subclasses with `allowedFields`; add new columns there too.
 - Schema changes go in a new migration in `app/Database/Migrations/` (never edit the old ones);
   they must work on both SQLite (local) and MySQL (production).
+- Volunteers are the single record for adults. Mentors = volunteers with a role in
+  `Config\Volunteers::$mentorRoles`; `students.mentor_id` is a volunteer id. Host homes link people via
+  `host_home_people`. Role tags live in `Config\Volunteers::$roles`; add new roles there, not in code.
+  The `mentors` table no longer exists (migration 000004 converted it in place).
 - Notes (`app/Controllers/Notes.php`, `app/Views/notes/_panel.php`) are polymorphic; to attach notes to a
   new kind of record add it to `NoteModel::SUBJECTS` (subject => required area) and the `subject()`
   loader, then include the panel view with `type`, `subjectId`, `notes`, `returnUrl`.
@@ -71,7 +75,8 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
   features, setup or deployment change.
 
 ## Roadmap / not built yet
-Applicants and interview rubric (area slug `applicants` already exists), volunteer lists,
+Applicants and interview rubric (area slug `applicants` already exists), the Men Volunteer List tab
+(a subset of the volunteer list, ignored on purpose),
 importing prior years' transcripts, finer Moodle→transcript mapping (one Moodle course feeding
 several transcript lines), gender-specific catalog lines (today unused lines simply don't print).
 - App timezone is America/Chicago (app/Config/App.php); note timestamps and dates use it.

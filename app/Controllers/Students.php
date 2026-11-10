@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Libraries\MoodleClient;
 use App\Models\HostHomeModel;
-use App\Models\MentorModel;
+use App\Models\VolunteerModel;
 use App\Models\NoteModel;
 use App\Models\StudentContactModel;
 use App\Models\StudentModel;
@@ -33,7 +33,10 @@ class Students extends BaseController
         $rows = $b->orderBy('last_name')->orderBy('first_name')->findAll();
 
         $homes   = array_column((new HostHomeModel())->findAll(), 'family_name', 'id');
-        $mentors = array_column((new MentorModel())->findAll(), 'name', 'id');
+        $mentors = [];
+        foreach ((new VolunteerModel())->findAll() as $v) {
+            $mentors[$v['id']] = $v['first_name'] . ' ' . $v['last_name'];
+        }
 
         return view('students/index', [
             'title' => 'Students', 'students' => $rows, 'q' => $q, 'homes' => $homes, 'mentors' => $mentors, 'year' => $year,
@@ -68,7 +71,7 @@ class Students extends BaseController
             'contacts' => (new StudentContactModel())->where('student_id', $id)->findAll(),
             'vehicles' => (new StudentVehicleModel())->where('student_id', $id)->findAll(),
             'home'     => $s['host_home_id'] ? (new HostHomeModel())->find($s['host_home_id']) : null,
-            'mentor'   => $s['mentor_id'] ? (new MentorModel())->find($s['mentor_id']) : null,
+            'mentor'   => $s['mentor_id'] ? (new VolunteerModel())->find($s['mentor_id']) : null,
             'acct'     => $acct,
             'paid'     => $paid,
             'moodleUrl' => (new MoodleClient())->baseUrl(),
@@ -269,7 +272,7 @@ class Students extends BaseController
 
         return [
             'homes'   => (new HostHomeModel())->where('program_year_id', $yid)->orderBy('family_name')->findAll(),
-            'mentors' => (new MentorModel())->where('program_year_id', $yid)->orderBy('name')->findAll(),
+            'mentors' => (new VolunteerModel())->withRoles(config('Volunteers')->mentorRoles),
         ];
     }
 

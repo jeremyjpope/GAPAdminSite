@@ -25,7 +25,7 @@
     <div class="col-md-3"><label class="form-label">Auto insurance</label><input class="form-control" name="auto_insurance" value="<?= $v('auto_insurance') ?>"></div>
     <div class="col-md-6"><label class="form-label">Housing preference</label><input class="form-control" name="housing_preference" value="<?= $v('housing_preference') ?>"></div>
     <div class="col-md-3"><label class="form-label">Host home</label><select class="form-select" name="host_home_id"><option value="">—</option><?php foreach ($homes as $h): ?><option value="<?= $h['id'] ?>" <?= ($s['host_home_id'] ?? '') == $h['id'] ? 'selected' : '' ?>><?= esc($h['family_name']) ?></option><?php endforeach ?></select></div>
-    <div class="col-md-3"><label class="form-label">Mentor</label><select class="form-select" name="mentor_id"><option value="">—</option><?php foreach ($mentors as $m): ?><option value="<?= $m['id'] ?>" <?= ($s['mentor_id'] ?? '') == $m['id'] ? 'selected' : '' ?>><?= esc($m['name']) ?></option><?php endforeach ?></select></div>
+    <div class="col-md-3"><label class="form-label">Mentor</label><select class="form-select" name="mentor_id"><option value="">—</option><?php foreach ($mentors as $m): ?><option value="<?= $m['id'] ?>" <?= ($s['mentor_id'] ?? '') == $m['id'] ? 'selected' : '' ?>><?= esc($m['first_name'] . ' ' . $m['last_name']) ?></option><?php endforeach ?></select></div>
     <div class="col-12"><label class="form-label">Allergies / medical notes</label><textarea class="form-control" name="allergies_medical" rows="2"><?= $v('allergies_medical') ?></textarea></div>
     <div class="col-12"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="3"><?= $v('notes') ?></textarea></div>
   </div></div>

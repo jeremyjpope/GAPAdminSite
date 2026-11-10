@@ -51,15 +51,26 @@ $routes->group('housing', ['filter' => 'area:housing'], static function ($r) {
     $r->post('/', 'HostHomes::store');
     $r->post('(:num)', 'HostHomes::update/$1');
     $r->post('(:num)/delete', 'HostHomes::delete/$1');
+    $r->post('(:num)/people', 'HostHomes::addPerson/$1');
+    $r->post('(:num)/people/(:num)/remove', 'HostHomes::removePerson/$1/$2');
     $r->post('assign', 'HostHomes::assign');
 });
 
 $routes->group('mentors', ['filter' => 'area:mentors'], static function ($r) {
     $r->get('/', 'Mentors::index');
     $r->post('/', 'Mentors::store');
-    $r->post('(:num)', 'Mentors::update/$1');
-    $r->post('(:num)/delete', 'Mentors::delete/$1');
     $r->post('assign', 'Mentors::assign');
+});
+
+$routes->group('volunteers', ['filter' => 'area:volunteers'], static function ($r) {
+    $r->get('/', 'Volunteers::index');
+    $r->get('new', 'Volunteers::create');
+    $r->post('/', 'Volunteers::store');
+    $r->get('(:num)', 'Volunteers::show/$1');
+    $r->get('(:num)/edit', 'Volunteers::edit/$1');
+    $r->post('(:num)', 'Volunteers::update/$1');
+    $r->post('(:num)/roles', 'Volunteers::saveRoles/$1');
+    $r->post('(:num)/delete', 'Volunteers::delete/$1');
 });
 
 $routes->group('groups', ['filter' => 'area:groups'], static function ($r) {

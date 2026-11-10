@@ -2,46 +2,29 @@
 
 namespace App\Controllers;
 
-use App\Models\MentorModel;
 use App\Models\StudentModel;
+use App\Models\VolunteerModel;
 
+/**
+ * Mentor assignments. A mentor is a volunteer with a Guys Mentor / Girls Mentor role;
+ * people are added or edited in the Volunteers area.
+ */
 class Mentors extends BaseController
 {
     public function index()
     {
         $year     = current_year();
-        $mentors  = (new MentorModel())->where('program_year_id', $year['id'] ?? 0)->orderBy('name')->findAll();
         $students = (new StudentModel())->where('program_year_id', $year['id'] ?? 0)->orderBy('last_name')->findAll();
+        $assigned = array_values(array_unique(array_filter(array_column($students, 'mentor_id'))));
+        $vm       = new VolunteerModel();
+        $mentors  = $vm->withRoles(config('Volunteers')->mentorRoles, $assigned);
+        $roles    = $vm->rolesFor(array_column($mentors, 'id'));
         $byMentor = [];
         foreach ($students as $s) {
             $byMentor[$s['mentor_id'] ?: 0][] = $s;
         }
 
-        return view('mentors/index', ['title' => 'Mentors', 'year' => $year, 'mentors' => $mentors, 'students' => $students, 'byMentor' => $byMentor]);
-    }
-
-    public function store()
-    {
-        $data = $this->collect();
-        $data['program_year_id'] = current_year()['id'];
-        (new MentorModel())->insert($data);
-
-        return redirect()->to('/mentors')->with('success', 'Mentor added.');
-    }
-
-    public function update(int $id)
-    {
-        (new MentorModel())->update($id, $this->collect());
-
-        return redirect()->to('/mentors')->with('success', 'Mentor saved.');
-    }
-
-    public function delete(int $id)
-    {
-        (new StudentModel())->where('mentor_id', $id)->set(['mentor_id' => null])->update();
-        (new MentorModel())->delete($id);
-
-        return redirect()->to('/mentors')->with('success', 'Mentor removed.');
+        return view('mentors/index', ['title' => 'Mentors', 'year' => $year, 'mentors' => $mentors, 'roles' => $roles, 'students' => $students, 'byMentor' => $byMentor]);
     }
 
     public function assign()
@@ -51,12 +34,5 @@ class Mentors extends BaseController
         (new StudentModel())->update($sid, ['mentor_id' => $mid ?: null]);
 
         return redirect()->to('/mentors')->with('success', 'Assignment saved.');
-    }
-
-    private function collect(): array
-    {
-        $p = fn (string $k) => trim((string) $this->request->getPost($k)) ?: null;
-
-        return ['name' => (string) $p('name'), 'email' => $p('email'), 'phone' => $p('phone'), 'gender' => $p('gender'), 'notes' => $p('notes')];
     }
 }

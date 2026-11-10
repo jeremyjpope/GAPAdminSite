@@ -296,6 +296,146 @@ def main(xlsx, out):
                                  reference=f'ck #{ck.group(1)}' if ck else '', note=f'{month}: {cell}'))
         st['tuition'] = dict(plan_type=plan_type, total_due=total, notes='; '.join(x for x in (plan, sent) if x), payments=payments)
 
+    # 6b. Volunteer List (+ compliance from 'GAP 360 for Women Invitees', leads from 'Volunteer Teams')
+    volunteers = {}
+
+    def vkey(first, last):
+        return (re.sub(r'[^a-z]', '', first.lower()), re.sub(r'[^a-z]', '', last.lower()))
+
+    def vol_get(first, last, email=''):
+        email = (email or '').strip().lower()
+        if email:
+            for v in volunteers.values():
+                if v['email'] and v['email'].lower() == email:
+                    return v
+        k = vkey(first, last)
+        if k not in volunteers:
+            volunteers[k] = dict(first_name=first.strip(), last_name=last.strip(), email=email, phone='', address='',
+                                 city_state_zip='', gender='', status='active', member_of_dbc='', tshirt_size='',
+                                 mp_group_placed_on=None, opportunity_response='', driver_cleared_year=None,
+                                 background_check='', saat_training='', notes='', roles=[])
+        return volunteers[k]
+
+    def add_role(v, role, category='', lead=None):
+        role = role.strip()
+        if not role:
+            return
+        for r in v['roles']:
+            if r['role'] == role:
+                if category and not r['category']:
+                    r['category'] = category
+                if lead is not None:
+                    r['is_lead'] = lead
+                return
+        v['roles'].append(dict(role=role, category=category or '', is_lead=bool(lead)))
+
+    if 'Volunteer List' in wb.sheetnames:
+        ws = wb['Volunteer List']
+        hdr = [s(c.value) for c in ws[1]]
+        col = {h: i for i, h in enumerate(hdr)}
+        role_cols = [i for i, h in enumerate(hdr) if h == 'Role']
+        for r in ws.iter_rows(min_row=2, values_only=True):
+            first, last = s(r[col['First Name']]), s(r[col['Last Name']])
+            if not first or not last:
+                continue
+            v = vol_get(first, last, s(r[col['Email']]))
+            v['email'] = v['email'] or s(r[col['Email']]).lower()
+            v['phone'] = v['phone'] or s(r[col['Phone']])
+            v['address'] = v['address'] or s(r[col['Address']])
+            v['city_state_zip'] = v['city_state_zip'] or s(r[col['CSZ']])
+            v['gender'] = 'M' if s(r[col['Male']]) in ('1', '1.0', 'yes', 'Yes') else v['gender']
+            v['member_of_dbc'] = v['member_of_dbc'] or s(r[col['Member of DBC']])
+            v['tshirt_size'] = v['tshirt_size'] or s(r[col['T-shirt Size']])
+            placed = s(r[col['Placed in Ministry Platform Group']])
+            v['mp_group_placed_on'] = v['mp_group_placed_on'] or (placed[:10] if re.match(r'\d{4}-\d\d-\d\d', placed) else None)
+            v['opportunity_response'] = v['opportunity_response'] or s(r[col['Opportunity Response Created']])[:190]
+            drv = s(r[col['Driver Opportunity Complete 2024']]).lower()
+            if drv.startswith('yes'):
+                v['driver_cleared_year'] = 2024
+            elif drv:
+                v['notes'] = (v['notes'] + '\n' if v['notes'] else '') + 'Driver: ' + s(r[col['Driver Opportunity Complete 2024']])
+            note = s(r[col['Notes']])
+            if note and note not in v['notes']:
+                v['notes'] = (v['notes'] + '\n' if v['notes'] else '') + note
+            cat = s(r[col['Life Skills Category']])
+            for i in role_cols:
+                role = s(r[i])
+                if role == 'Meal Provider Guest':
+                    add_role(v, 'Meal Provider'); add_role(v, 'Guest'); continue
+                if role == 'Career Moment Guest':
+                    add_role(v, 'Career Moment'); add_role(v, 'Guest'); continue
+                add_role(v, role, cat if role in ('Life Skills', 'Fitness') else '')
+            if cat and not any(r['role'] in ('Life Skills', 'Fitness') for r in v['roles']):
+                v['notes'] = (v['notes'] + '\n' if v['notes'] else '') + 'Life skills category: ' + cat
+            if any(r['role'] == 'Potential Volunteer' for r in v['roles']):
+                v['status'] = 'potential'
+
+    if 'GAP 360 for Women Invitees' in wb.sheetnames:
+        ws = wb['GAP 360 for Women Invitees']
+        hdr = [s(c.value) for c in ws[1]]
+        col = {h: i for i, h in enumerate(hdr)}
+        for r in ws.iter_rows(min_row=2, values_only=True):
+            first, last = s(r[col['First Name']]), s(r[col['Last Name']])
+            if not first or not last:
+                continue
+            k = vkey(first, last)
+            v = volunteers.get(k)
+            if not v:
+                email = s(r[col['Email']]).lower()
+                v = next((x for x in volunteers.values() if email and x['email'] == email), None)
+            if not v:
+                continue  # only enrich people already on the volunteer list
+            v['gender'] = v['gender'] or 'F'
+            v['background_check'] = v['background_check'] or s(r[col['Background Check']])[:120]
+            v['saat_training'] = v['saat_training'] or s(r[col['SAAT Training']])[:120]
+            v['tshirt_size'] = v['tshirt_size'] or s(r[col['T-shirt Size']])
+
+    if 'Volunteer Teams' in wb.sheetnames:
+        area = ''
+        for r in wb['Volunteer Teams'].iter_rows(min_row=2, values_only=True):
+            area = s(r[0]) or area          # merged cells: carry the life-skill area down
+            lead = s(r[2])
+            if not lead:
+                continue
+            parts = lead.split()
+            if len(parts) < 2:
+                continue
+            v = volunteers.get(vkey(parts[0], parts[-1]))
+            if v:
+                add_role(v, 'Life Skills', area, lead=True)
+            else:
+                warnings.append(f'Volunteer Teams lead "{lead}" not on the Volunteer List')
+
+    # mentors and host-home people are volunteers too
+    for m in mentors.values():
+        parts = m['name'].split()
+        if len(parts) >= 2:
+            v = vol_get(' '.join(parts[:-1]), parts[-1], m['email'])   # "Katie Jo Groves" -> first "Katie Jo"
+            v['email'] = v['email'] or m['email'].lower()
+            v['gender'] = v['gender'] or m['gender']
+            add_role(v, 'Girls Mentor' if m['gender'] == 'F' else 'Guys Mentor')
+    for h in homes.values():
+        people = []
+        emails = [e for e in (h['email'], h['email2']) if e]
+        phones = [p for p in (h['phone'], h['phone2']) if p]
+        parts = [p.strip() for p in re.split(r'\s*(?:&|\band\b)\s*', h['family_name']) if p.strip()]
+        lastname = ''
+        for p in reversed(parts):
+            toks = p.split()
+            if len(toks) >= 2:
+                lastname = toks[-1] if toks[-1].rstrip('.').lower() not in ('sr', 'jr') else ' '.join(toks[-2:])
+                first = ' '.join(toks[:-1]) if toks[-1].rstrip('.').lower() not in ('sr', 'jr') else ' '.join(toks[:-2])
+            else:
+                first = toks[0]
+            people.insert(0, (first, lastname))
+        for i, (first, last) in enumerate(people):
+            v = vol_get(first, last, emails[i] if i < len(emails) else '')
+            v['email'] = v['email'] or (emails[i].lower() if i < len(emails) else '')
+            v['phone'] = v['phone'] or (phones[i] if i < len(phones) else '')
+            v['address'] = v['address'] or h['address']
+            add_role(v, 'Host Family')
+        h['people'] = [f'{f} {l}'.strip() for f, l in people]
+
     # 7. Groups Teams: five regions with different shapes (see sheet)
     group_sets = []
     if 'Groups Teams' in wb.sheetnames:
@@ -343,10 +483,11 @@ def main(xlsx, out):
             st.pop(drop, None)
         out_students.append(st)
 
-    data = dict(students=out_students, host_homes=list(homes.values()), mentors=list(mentors.values()), group_sets=group_sets)
+    data = dict(students=out_students, host_homes=list(homes.values()), mentors=list(mentors.values()), group_sets=group_sets,
+                volunteers=list(volunteers.values()))
     with open(out, 'w') as fh:
         json.dump(data, fh, indent=2)
-    print(f'Wrote {out}: {len(out_students)} students, {len(homes)} host homes, {len(mentors)} mentors, {len(group_sets)} group sets')
+    print(f'Wrote {out}: {len(out_students)} students, {len(homes)} host homes, {len(mentors)} mentors, {len(group_sets)} group sets, {len(volunteers)} volunteers')
     for w in warnings:
         print('WARNING:', w)
 

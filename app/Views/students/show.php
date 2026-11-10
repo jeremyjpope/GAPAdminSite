@@ -34,8 +34,8 @@
       <dt class="col-sm-3">Phone</dt><dd class="col-sm-9"><?= esc($s['phone']) ?></dd>
       <dt class="col-sm-3">Address</dt><dd class="col-sm-9"><?= esc($s['address']) ?></dd>
       <dt class="col-sm-3">Birthday</dt><dd class="col-sm-9"><?= fmt_date($s['birthday']) ?></dd>
-      <dt class="col-sm-3">Host home</dt><dd class="col-sm-9"><?= $home ? esc($home['family_name']) . ' <span class="text-secondary">· ' . esc($home['phone']) . ' · ' . esc($home['email']) . '</span>' : '<span class="text-secondary">none</span>' ?></dd>
-      <dt class="col-sm-3">Mentor</dt><dd class="col-sm-9"><?= $mentor ? esc($mentor['name']) . ' <span class="text-secondary">· ' . esc($mentor['email']) . '</span>' : '<span class="text-secondary">none</span>' ?></dd>
+      <dt class="col-sm-3">Host home</dt><dd class="col-sm-9"><?= $home ? '<a href="' . site_url('housing') . '">' . esc($home['family_name']) . '</a> <span class="text-secondary">· ' . esc($home['address']) . '</span>' : '<span class="text-secondary">none</span>' ?></dd>
+      <dt class="col-sm-3">Mentor</dt><dd class="col-sm-9"><?= $mentor ? '<a href="' . site_url('volunteers/' . $mentor['id']) . '">' . esc($mentor['first_name'] . ' ' . $mentor['last_name']) . '</a> <span class="text-secondary">· ' . esc($mentor['email']) . '</span>' : '<span class="text-secondary">none</span>' ?></dd>
       <dt class="col-sm-3">Placement</dt><dd class="col-sm-9"><?= esc($s['placement_preference']) ?></dd>
       <dt class="col-sm-3">T-shirt</dt><dd class="col-sm-9"><?= esc($s['tshirt_size']) ?></dd>
       <dt class="col-sm-3">Driving</dt><dd class="col-sm-9"><?= esc($s['cleared_to_drive']) ?> <?= $s['auto_insurance'] ? '· ' . esc($s['auto_insurance']) : '' ?></dd>

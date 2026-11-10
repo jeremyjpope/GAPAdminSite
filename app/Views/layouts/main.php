@@ -45,6 +45,7 @@
         ['housing', 'Host Homes', 'house-heart', 'housing'],
         ['mentors', 'Mentors', 'person-check', 'mentors'],
         ['groups', 'Groups', 'diagram-3', 'groups'],
+        ['volunteers', 'Volunteers', 'people-fill', 'volunteers'],
         ['transcripts', 'Transcripts', 'file-earmark-text', 'transcripts'],
       ];
       $path = trim(uri_string(), '/');

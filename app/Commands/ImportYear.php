@@ -6,7 +6,9 @@ use App\Models\GroupMemberModel;
 use App\Models\GroupModel;
 use App\Models\GroupSetModel;
 use App\Models\HostHomeModel;
-use App\Models\MentorModel;
+use App\Models\HostHomePersonModel;
+use App\Models\VolunteerModel;
+use App\Models\VolunteerRoleModel;
 use App\Models\PaymentModel;
 use App\Models\ProgramYearModel;
 use App\Models\StudentContactModel;
@@ -59,13 +61,51 @@ class ImportYear extends BaseCommand
         CLI::write("Importing into program year {$year['label']} (id {$year['id']})", 'yellow');
         $yid = $year['id'];
 
-        // Host homes
+        // Volunteers (one record per adult; mentors and host-home people are volunteers too)
+        $vm = new VolunteerModel();
+        $rm = new VolunteerRoleModel();
+        $volIds = [];   // "First Last" => id
+        $vCreated = $vUpdated = 0;
+        foreach ($data['volunteers'] ?? [] as $v) {
+            $row = $vm->findByEmailOrName($v['email'] ?: null, $v['first_name'], $v['last_name']);
+            $f   = [];
+            foreach (['first_name', 'last_name', 'email', 'phone', 'address', 'city_state_zip', 'gender', 'status', 'member_of_dbc', 'tshirt_size',
+                      'mp_group_placed_on', 'opportunity_response', 'driver_cleared_year', 'background_check', 'saat_training', 'notes'] as $k) {
+                $f[$k] = ($v[$k] ?? '') === '' ? null : $v[$k];
+            }
+            if ($row) {
+                // fill blanks only; never overwrite what was edited in the site
+                $upd = [];
+                foreach ($f as $k => $val) {
+                    if ($val !== null && ($row[$k] === null || $row[$k] === '')) {
+                        $upd[$k] = $val;
+                    }
+                }
+                if ($upd) {
+                    $vm->update($row['id'], $upd);
+                }
+                $vid = $row['id'];
+                $vUpdated++;
+            } else {
+                $f['status'] ??= 'active';
+                $vm->insert($f);
+                $vid = $vm->getInsertID();
+                $vCreated++;
+            }
+            foreach ($v['roles'] ?? [] as $r) {
+                $rm->ensure($vid, $r['role'], $r['category'] ?: null, ! empty($r['is_lead']) ? true : null);
+            }
+            $volIds[strtolower($v['first_name'] . ' ' . $v['last_name'])] = $vid;
+        }
+        CLI::write("Volunteers: {$vCreated} created, {$vUpdated} updated");
+
+        // Host homes (household per year) + their people
         $hm      = new HostHomeModel();
+        $pm      = new HostHomePersonModel();
         $homeIds = [];
         foreach ($data['host_homes'] ?? [] as $h) {
             $row = $hm->where('program_year_id', $yid)->where('family_name', $h['family_name'])->first();
-            $f   = ['program_year_id' => $yid, 'family_name' => $h['family_name'], 'address' => $h['address'] ?: null, 'email' => $h['email'] ?: null,
-                    'email2' => $h['email2'] ?: null, 'phone' => $h['phone'] ?: null, 'phone2' => $h['phone2'] ?: null, 'notes' => $h['notes'] ?: null];
+            $f   = ['program_year_id' => $yid, 'family_name' => $h['family_name'], 'address' => $h['address'] ?: null, 'notes' => $h['notes'] ?: null];
             if ($row) {
                 $hm->update($row['id'], $f);
                 $id = $row['id'];
@@ -74,24 +114,20 @@ class ImportYear extends BaseCommand
                 $id = $hm->getInsertID();
             }
             $homeIds[$h['key'] ?? $h['family_name']] = $id;
+            foreach ($h['people'] ?? [] as $name) {
+                $vid = $volIds[strtolower($name)] ?? null;
+                if ($vid && ! $pm->where('host_home_id', $id)->where('volunteer_id', $vid)->first()) {
+                    $pm->insert(['host_home_id' => $id, 'volunteer_id' => $vid]);
+                }
+            }
         }
         CLI::write('Host homes: ' . count($homeIds));
 
-        // Mentors
-        $mm        = new MentorModel();
+        // Mentors: map by name to volunteer ids for the student links
         $mentorIds = [];
         foreach ($data['mentors'] ?? [] as $m) {
-            $row = $mm->where('program_year_id', $yid)->where('name', $m['name'])->first();
-            $f   = ['program_year_id' => $yid, 'name' => $m['name'], 'email' => $m['email'] ?: null, 'gender' => $m['gender'] ?: null];
-            if ($row) {
-                $mm->update($row['id'], $f);
-                $mentorIds[$m['name']] = $row['id'];
-            } else {
-                $mm->insert($f);
-                $mentorIds[$m['name']] = $mm->getInsertID();
-            }
+            $mentorIds[$m['name']] = $volIds[strtolower($m['name'])] ?? null;
         }
-        CLI::write('Mentors: ' . count($mentorIds));
 
         // Students
         $sm = new StudentModel();

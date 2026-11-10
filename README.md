@@ -19,9 +19,10 @@ Staff log in with their **Moodle username and password**. Only people listed und
 | **Dashboard** | Headcount, tuition collected vs. outstanding, students without a host home or mentor, recent payments. |
 | **Students** | Directory for the current program year: contact details, parents/guardians, vehicle + VIN + oil info, medical notes, driving clearance, placement preference, photo upload, free-text notes. Link to the Moodle account and view the live Moodle gradebook. "Sync from Moodle" creates/links students from everyone enrolled as a student in the year's overall-standing course. |
 | **Tuition** | Per-student plan (year / semester / monthly, total due) and a payment ledger (date, amount, method, check #, note). Balances at a glance; post-dated checks are shown separately from money already received. |
-| **Host Homes** | Host families with contacts and addresses; assign students; see who lives where. |
+| **Host Homes** | Households for the year (name, address, notes) with the people who live there linked from Volunteers; assign students; see who lives where. |
 | **Notes** | Dated (optionally timed) notes on a student or a host home: strikes, discipline, parent/host contact, housing, medical, praise. Each note is signed automatically with the logged-in user and the entry time; only the author or a super admin can edit or delete it. Student notes sit on the student page; host home notes open from the journal button on each home. |
-| **Mentors** | Mentor list; assign one per student. |
+| **Mentors** | Assign one mentor per student. A mentor is simply a volunteer with the Guys Mentor or Girls Mentor role. |
+| **Volunteers** | One record per adult who serves (contact, DBC membership, Ministry Platform placement, driver clearance year, background check, SAAT, notes) with any number of role tags (Host Family, Life Skills + category and lead flag, Guys/Girls Mentor, Special Topic, …) and a status (active / inactive / potential). Mentors and host-home people are volunteers, so nobody is stored twice. Dated notes attach here too. |
 | **Groups** | Any number of "group sets" per year (presentation teams, Children's Learning Center age groups, guys' and girls' Friday night groups, accountability partners…). Each set has named groups; a student is in at most one group per set. Printable roster per set. |
 | **Transcripts** | A per-year **course catalog** (pillar, course, description, term, hours) that defines the lines on the transcript. Enter letter grades by hand or **pull course totals from Moodle** for lines mapped to a Moodle course. Generates the official transcript as a PDF (same layout as the 2022-23 transcripts). |
 | **Site admin** | Who can log in and which areas they see; program years (dates, tuition rates, grading scale, Moodle overall-standing course); Moodle connection check. |
@@ -64,7 +65,10 @@ php spark gap:import writable/import/year8.json          # --year 2026-27 to tar
 ```
 
 The script reads the *Student Names & Email Addresses*, *Applicants*, *Student Auto Information*,
-*Mentor Information*, *Host Home Assignments*, *Tuition Info* and *Groups Teams* sheets. It prints warnings for
+*Mentor Information*, *Host Home Assignments*, *Tuition Info*, *Groups Teams*, *Volunteer List*,
+*GAP 360 for Women Invitees* (background check / SAAT only, for people already on the volunteer list)
+and *Volunteer Teams* (life-skills leads) sheets. Volunteers are matched by email, then by name, and the
+import only fills blank fields on an existing volunteer. It prints warnings for
 anything it could not interpret (for example a monthly plan marked PAID with no amounts in the
 month grid). Payment cells like `ck #1094 $400/parents' acct; dated 9/15/26` become ledger rows
 with the check number and date; the full cell text is kept in the note. The import is idempotent:
@@ -117,12 +121,13 @@ commands on the server with `sudo -u www-data` so log, session and upload files 
 ## Project layout
 
 ```
-app/Config/Areas.php            access areas (students, tuition, housing, mentors, groups, transcripts, applicants, admin)
+app/Config/Areas.php            access areas (students, tuition, housing, mentors, volunteers, groups, transcripts, applicants, admin)
+app/Config/Volunteers.php       role tags, mentor roles, life-skills categories, statuses
 app/Config/Moodle.php           Moodle settings (overridden from .env)
 app/Libraries/MoodleClient.php  REST client (login, cohorts, users, grades)
 app/Libraries/Auth.php          session helper + area checks
 app/Filters/                    auth / area route filters
-app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, Mentors, Groups, Notes, Transcripts, Admin
+app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, Mentors, Volunteers, Groups, Notes, Transcripts, Admin
 app/Views/                      Bootstrap views; transcripts/pdf.php is the PDF template
 app/Database/Migrations/        schema (one initial migration)
 app/Database/Seeds/             InitialSeeder (super admin, 2026-27, transcript catalog)
@@ -136,7 +141,9 @@ public/img/gap-logo.png         logo used on the transcript
 
 `program_years` → `students` (one row per student per year) → `student_contacts`, `student_vehicles`,
 `tuition_accounts` (plan + total due), `payments`, `transcript_grades`.
-`host_homes` and `mentors` belong to a program year; `transcript_courses` is the per-year catalog.
+`volunteers` (one per adult, not per year) → `volunteer_roles` (role, life-skills category, is_lead).
+`students.mentor_id` points at a volunteer. `host_homes` belong to a program year and link their people
+through `host_home_people` → `volunteers`. `transcript_courses` is the per-year catalog.
 `group_sets` → `groups` → `group_members` hold the team / Friday night / accountability groupings.
 `notes` is polymorphic (`subject_type` student|host_home + `subject_id`), with `noted_on` (date), optional
 `noted_time`, `category`, `user_id` and an `author_name` snapshot.

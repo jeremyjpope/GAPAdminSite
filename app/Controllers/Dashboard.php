@@ -4,7 +4,7 @@ namespace App\Controllers;
 
 use App\Libraries\Auth;
 use App\Models\HostHomeModel;
-use App\Models\MentorModel;
+use App\Models\VolunteerModel;
 use App\Models\PaymentModel;
 use App\Models\ProgramYearModel;
 use App\Models\StudentModel;
@@ -33,7 +33,7 @@ class Dashboard extends BaseController
             'unhoused'    => count(array_filter($students, fn ($s) => empty($s['host_home_id']))),
             'unmentored'  => count(array_filter($students, fn ($s) => empty($s['mentor_id']))),
             'hostHomes'   => (new HostHomeModel())->where('program_year_id', $yid)->countAllResults(),
-            'mentors'     => (new MentorModel())->where('program_year_id', $yid)->countAllResults(),
+            'mentors'     => count((new VolunteerModel())->withRoles(config('Volunteers')->mentorRoles)),
             'tuitionDue'  => (float) $due,
             'tuitionPaid' => (float) $paid,
             'recent'      => $recent,

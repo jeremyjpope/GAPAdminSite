@@ -6,6 +6,7 @@ use App\Libraries\Auth;
 use App\Models\HostHomeModel;
 use App\Models\NoteModel;
 use App\Models\StudentModel;
+use App\Models\VolunteerModel;
 use CodeIgniter\Exceptions\PageNotFoundException;
 
 /**
@@ -22,7 +23,7 @@ class Notes extends BaseController
         return view('notes/index', [
             'title' => 'Notes: ' . $label, 'type' => $type, 'subject' => $subject, 'label' => $label,
             'notes' => (new NoteModel())->forSubject($type, $id),
-            'backUrl' => $type === 'student' ? site_url('students/' . $id) : site_url('housing'),
+            'backUrl' => $type === 'student' ? site_url('students/' . $id) : ($type === 'volunteer' ? site_url('volunteers/' . $id) : site_url('housing')),
         ]);
     }
 
@@ -92,6 +93,9 @@ class Notes extends BaseController
         if ($type === 'student') {
             $row = (new StudentModel())->find($id);
             $label = $row ? student_name($row) : '';
+        } elseif ($type === 'volunteer') {
+            $row = (new VolunteerModel())->find($id);
+            $label = $row ? trim($row['first_name'] . ' ' . $row['last_name']) : '';
         } else {
             $row = (new HostHomeModel())->find($id);
             $label = $row['family_name'] ?? '';
