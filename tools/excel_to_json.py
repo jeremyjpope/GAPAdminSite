@@ -359,6 +359,11 @@ def main(xlsx, out, label=None):
             elif current:
                 if e:
                     current['contacts'].append(dict(name=e, email=f, phone=g))
+                if not current['host_home'] and h and section == 'OWN':
+                    homes.setdefault(h, dict(key=h, family_name=h, address=i.replace('\n', ', '), notes='Student-acquired home', contacts=[]))
+                    current['host_home'] = h
+                    homes[h]['contacts'].append(dict(email=j, phone=k))
+                    continue
                 if current['host_home'] and (h or j or k):
                     home = homes[current['host_home']]
                     if h and section == 'OWN' and h not in home['family_name']:
@@ -431,6 +436,15 @@ def main(xlsx, out, label=None):
                     a_, b_ = re.search(r'\$(\d+)', s(r[14])), re.search(r'\$(\d+)', s(r[15]))
                     if a_ and b_:
                         housing_rates = (float(a_.group(1)), float(b_.group(1)))
+    # Workbook-wide hint when there is no rate box: the usual semester amount implies the year total.
+    sem_amounts = []
+    for st in students.values():
+        txt = st.get('_tuition_text', '')
+        if txt and plan_from_text(txt) == 'semester':
+            m_ = re.search(r'\$\s?(\d[\d,]*)', txt)
+            if m_:
+                sem_amounts.append(float(m_.group(1).replace(',', '')))
+    usual_total = (max(set(sem_amounts), key=sem_amounts.count) * 2) if sem_amounts else None
     for st in students.values():
         txt = st.pop('_tuition_text', '')
         if st['tuition'] or not txt:
@@ -438,6 +452,11 @@ def main(xlsx, out, label=None):
         plan_type = plan_from_text(txt)
         amounts = [float(a.replace(',', '')) for a in re.findall(r'\$\s?(\d[\d,]*(?:\.\d\d)?)', txt)]
         tier = None
+        if not housing_rates and usual_total:
+            if plan_type == 'year' and amounts and amounts[0] in (usual_total, usual_total * 10 / 7):
+                tier = amounts[0]
+            else:
+                tier = usual_total
         if housing_rates:
             lo, hi = housing_rates
             if any(a in (hi, hi / 2, hi / 10) for a in amounts):
@@ -453,19 +472,31 @@ def main(xlsx, out, label=None):
             first_amt = amounts[0]
             plan_type = 'year' if first_amt == total else 'semester' if first_amt == total / 2 else 'month' if first_amt == total / 10 else 'other'
         payments = []
-        for seg in re.split(r';|,(?=[^,]*\$)|\band\b(?=[^;]*\$)', txt):
+        cum = 0.0
+        for seg in re.split(r';|,(?=[^,]*\$)|\band\b(?=[^;]*\$)|:(?=\s*\$)', txt):
             m = re.search(r'\$\s?(\d[\d,]*(?:\.\d\d)?)', seg)
             if not m:
                 continue
             low = seg.lower()
             if 'paid' not in low and 'deposit' not in low and 'check' not in low and 'ck' not in low and 'online' not in low and 'cash' not in low:
                 continue
+            if re.search(r'scholarship|refund|forgiven|debt', low) and 'deposited' not in low:
+                continue
+            amt = float(m.group(1).replace(',', ''))
+            # "$1050 paid by 10/1" / "$700 paid as of 9/4" are running totals, not new payments
+            if re.search(r'\$\s?[\d,]+(?:\.\d\d)?\s*(?:paid\s+)?(?:by|as of)\b', low) or re.search(r'total paid', low):
+                inc = amt - cum
+                if inc <= 0:
+                    continue
+                amt = inc
+            cum += amt
             method = 'online' if 'online' in low else 'check' if ('check' in low or re.search(r'\bck\b', low)) else 'cash' if 'cash' in low else 'other'
             ck = re.search(r'(?:check|ck)\s*#?\s*(\d+)', seg, re.I)
             d_ = parse_date(seg, year_for_month)
-            payments.append(dict(paid_on=d_ or f'{start_year}-08-01', amount=float(m.group(1).replace(',', '')),
+            default_d = f'{end_year}-01-15' if 'spring' in low else f'{start_year}-08-01'
+            payments.append(dict(paid_on=d_ or default_d, amount=amt,
                                  method=method, reference=f'ck #{ck.group(1)}' if ck else '',
-                                 note='Imported: ' + seg.strip()[:160] + ('' if d_ else ' (date not in sheet; defaulted to Aug 1)')))
+                                 note='Imported: ' + seg.strip()[:160] + ('' if d_ else ' (date not in sheet; defaulted)')))
         st['tuition'] = dict(plan_type=plan_type, total_due=total, notes=txt[:500], payments=payments)
         if total and sum(p['amount'] for p in payments) > total:
             warnings.append(f'{st["first_name"]} {st["last_name"]}: imported payments ({int(sum(p["amount"] for p in payments))}) exceed the total ({int(total)}); check the ledger')
@@ -646,8 +677,9 @@ def main(xlsx, out, label=None):
 
     # ------------------------------------------------------------------ groups
     group_sets = []
-    if 'Groups Teams' in wb.sheetnames:
-        ws = wb['Groups Teams']
+    gsheet = next((n for n in wb.sheetnames if norm(n) == 'groupsteams'), None)
+    if gsheet:
+        ws = wb[gsheet]
         grid = {}
         for row in ws.iter_rows():
             for c3 in row:
@@ -674,8 +706,50 @@ def main(xlsx, out, label=None):
                     titles.append((rr, cc, name, glabel))
         titles.sort()
 
+        # Matrix layout: a header row "First | Last | <set> | <set> ...", one row per student.
+        matrix_sets = set()
+        for (rr, cc), txt in sorted(grid.items()):
+            if txt.lower() == 'first' and grid.get((rr, cc + 1), '').lower() == 'last':
+                extra = []
+                c2 = cc + 2
+                while grid.get((rr, c2)):
+                    extra.append((c2, grid[(rr, c2)].strip()))
+                    c2 += 1
+                if len(extra) < 2:
+                    continue
+                sets = {name: {} for _, name in extra}
+                r2 = rr + 1
+                while grid.get((r2, cc)) or grid.get((r2, cc + 1)):
+                    m = full_name(f"{grid.get((r2, cc), '')} {grid.get((r2, cc + 1), '')}".strip())
+                    if m:
+                        for c3, name in extra:
+                            g = grid.get((r2, c3), '')
+                            if g and m not in sets[name].setdefault(g, []):
+                                sets[name][g].append(m)
+                    r2 += 1
+                for _, name in extra:
+                    if re.search(r'pre-?arrival|door code|assignment', name, re.I):
+                        continue
+                    biggest = max((len(v) for v in sets[name].values()), default=0)
+                    total_m = sum(len(v) for v in sets[name].values())
+                    if sets[name] and total_m and biggest / total_m > 0.9 and len(sets[name]) > 1:
+                        continue   # a status column ("done"), not a grouping
+                    if sets[name]:
+                        label_ = 'Team' if 'team' in name.lower() else 'Group'
+                        group_sets.append(dict(name=name, kind='group', group_label=label_, groups=[dict(name=k, members=v) for k, v in sets[name].items()]))
+                        matrix_sets.add(norm(name))
+                titles = [t for t in titles if not (t[0] >= rr and t[0] < r2)]
+        if matrix_sets:
+            # the matrix already covers these; drop title-based duplicates (ChurchLife == Sunday Ministry Investment)
+            titles = [t for t in titles if not (t[2] == 'Fall ChurchLife' and 'sundayministryinvestment' in matrix_sets)]
+
+        all_titles = list(titles)
+
         def region_end(r0, c0):
-            later = [rr for rr, cc, _, _ in titles if rr > r0 and abs(cc - c0) <= 2]
+            later = [rr for rr, cc, _, _ in all_titles if rr > r0 and abs(cc - c0) <= 2]
+            # also stop at the next header row ("First"/"Last") in this column block
+            hdrs_below = [rr for (rr, cc), t in grid.items() if rr > r0 + 1 and abs(cc - c0) <= 3 and t.lower() in ('first', 'last')]
+            later += [h for h in hdrs_below]
             return (min(later) - 1) if later else max_row
 
         for r0, c0, name, glabel in titles:
