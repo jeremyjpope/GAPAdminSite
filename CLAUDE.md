@@ -48,7 +48,8 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 - `/dev-login` logs in as the first super admin without Moodle (development environment only).
   Note the built-in server caches env vars: after editing `.env`, restart `spark serve`.
 - Re-import the Excel data with `tools/excel_to_json.py` + `php spark gap:import` (see README);
-  `php spark gap:year` creates a missing program year. The import is idempotent but re-applies sheet
+  `php spark gap:year` creates a missing program year; `php spark gap:volunteer-status <current year json>`
+  sets the volunteers named in that file active and all others inactive (status is not year-scoped). The import is idempotent but re-applies sheet
   values to students and replaces group membership; a payment is a duplicate only when date, amount
   AND note match, so re-importing after the parser's note wording changed could double payments;
   check with a student+date+amount count before and after. Payments entered in the site are real

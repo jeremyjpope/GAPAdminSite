@@ -63,7 +63,13 @@ pip3 install openpyxl
 php spark gap:year 2024-25 --number 6 --early 3500       # only if the program year does not exist yet
 python3 tools/excel_to_json.py "/path/to/2024-25 Year 6 Database.xlsx" writable/import/year6.json 2024-25
 php spark gap:import writable/import/year6.json --year 2024-25
+php spark gap:volunteer-status writable/import/year8.json     # current year only: see below
 ```
+
+Volunteer status is not year-scoped (a volunteer is one record across years), so after importing the
+*current* year's workbook run `gap:volunteer-status` with that year's JSON: everyone it names (volunteer
+list, mentors, host-home people) becomes *active* and every other volunteer becomes *inactive*.
+Add `--dry-run` to preview. Do not run it with an old year's file.
 
 The third argument to the script is the program-year label; it decides which calendar years undated
 payments and "Fall"/"Spring" belong to. All eight workbooks from 2019-20 to 2026-27 have been imported;
@@ -142,7 +148,7 @@ app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, M
 app/Views/                      Bootstrap views; transcripts/pdf.php is the PDF template
 app/Database/Migrations/        schema (one initial migration)
 app/Database/Seeds/             InitialSeeder (super admin, 2026-27, transcript catalog)
-app/Commands/ImportYear.php     php spark gap:import
+app/Commands/                   gap:import, gap:year, gap:volunteer-status (spark commands)
 app/Helpers/gap_helper.php      current_year(), money(), letter_for(), ...
 tools/excel_to_json.py          Excel → JSON for the importer
 public/img/gap-logo.png         logo used on the transcript
