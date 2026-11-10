@@ -21,6 +21,7 @@ Staff log in with their **Moodle username and password**. Only people listed und
 | **Tuition** | Per-student plan (year / semester / monthly, total due) and a payment ledger (date, amount, method, check #, note). Balances at a glance; post-dated checks are shown separately from money already received. |
 | **Host Homes** | Host families with contacts and addresses; assign students; see who lives where. |
 | **Mentors** | Mentor list; assign one per student. |
+| **Groups** | Any number of "group sets" per year (presentation teams, Children's Learning Center age groups, guys' and girls' Friday night groups, accountability partners…). Each set has named groups; a student is in at most one group per set. Printable roster per set. |
 | **Transcripts** | A per-year **course catalog** (pillar, course, description, term, hours) that defines the lines on the transcript. Enter letter grades by hand or **pull course totals from Moodle** for lines mapped to a Moodle course. Generates the official transcript as a PDF (same layout as the 2022-23 transcripts). |
 | **Site admin** | Who can log in and which areas they see; program years (dates, tuition rates, grading scale, Moodle overall-standing course); Moodle connection check. |
 
@@ -62,7 +63,7 @@ php spark gap:import writable/import/year8.json          # --year 2026-27 to tar
 ```
 
 The script reads the *Student Names & Email Addresses*, *Applicants*, *Student Auto Information*,
-*Mentor Information*, *Host Home Assignments* and *Tuition Info* sheets. It prints warnings for
+*Mentor Information*, *Host Home Assignments*, *Tuition Info* and *Groups Teams* sheets. It prints warnings for
 anything it could not interpret (for example a monthly plan marked PAID with no amounts in the
 month grid). Payment cells like `ck #1094 $400/parents' acct; dated 9/15/26` become ledger rows
 with the check number and date; the full cell text is kept in the note. The import is idempotent:
@@ -115,12 +116,12 @@ commands on the server with `sudo -u www-data` so log, session and upload files 
 ## Project layout
 
 ```
-app/Config/Areas.php            access areas (students, tuition, housing, mentors, transcripts, applicants, admin)
+app/Config/Areas.php            access areas (students, tuition, housing, mentors, groups, transcripts, applicants, admin)
 app/Config/Moodle.php           Moodle settings (overridden from .env)
 app/Libraries/MoodleClient.php  REST client (login, cohorts, users, grades)
 app/Libraries/Auth.php          session helper + area checks
 app/Filters/                    auth / area route filters
-app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, Mentors, Transcripts, Admin
+app/Controllers/                Auth, Dashboard, Students, Tuition, HostHomes, Mentors, Groups, Transcripts, Admin
 app/Views/                      Bootstrap views; transcripts/pdf.php is the PDF template
 app/Database/Migrations/        schema (one initial migration)
 app/Database/Seeds/             InitialSeeder (super admin, 2026-27, transcript catalog)
@@ -135,5 +136,6 @@ public/img/gap-logo.png         logo used on the transcript
 `program_years` → `students` (one row per student per year) → `student_contacts`, `student_vehicles`,
 `tuition_accounts` (plan + total due), `payments`, `transcript_grades`.
 `host_homes` and `mentors` belong to a program year; `transcript_courses` is the per-year catalog.
+`group_sets` → `groups` → `group_members` hold the team / Friday night / accountability groupings.
 `users` + `user_areas` is the login allowlist. All Moodle references are plain integer ids
 (`moodle_userid`, `moodle_course_id`, `moodle_overall_course_id`).

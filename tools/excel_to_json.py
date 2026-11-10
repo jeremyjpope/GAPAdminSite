@@ -80,6 +80,8 @@ def main(xlsx, out):
     def find(name):
         parts = name.replace('(', ' (').split()
         parts = [p for p in parts if p]
+        if len(parts) == 1:
+            parts = parts + ['']
         if len(parts) < 2:
             return None
         # drop parenthesised nickname tokens
@@ -93,6 +95,11 @@ def main(xlsx, out):
             k = key(p, last)
             if k in students:
                 return students[k]
+        # last resort: a unique first-name match (handles a misspelt or missing last name)
+        hits = [st for st in students.values() if first.lower() in (st['first_name'].lower(), st['preferred_name'].lower())]
+        if len(hits) == 1:
+            warnings.append(f'Matched "{name}" to {hits[0]["first_name"]} {hits[0]["last_name"]} by first name only')
+            return hits[0]
         warnings.append(f'Could not match "{name}" to a student')
         return None
 
@@ -289,6 +296,45 @@ def main(xlsx, out):
                                  reference=f'ck #{ck.group(1)}' if ck else '', note=f'{month}: {cell}'))
         st['tuition'] = dict(plan_type=plan_type, total_due=total, notes='; '.join(x for x in (plan, sent) if x), payments=payments)
 
+    # 7. Groups Teams: five regions with different shapes (see sheet)
+    group_sets = []
+    if 'Groups Teams' in wb.sheetnames:
+        ws = wb['Groups Teams']
+        rows = {r: {c.column_letter: s(c.value) for c in row if s(c.value)} for r, row in enumerate(ws.iter_rows(), start=1)}
+
+        def names_of(st_name):
+            st = find(st_name)
+            return f"{st['first_name']} {st['last_name']}" if st else None
+
+        def region(name, kind, label, col_group, col_first, col_last, r0, r1, carry=True, single=None):
+            groups, cur = {}, single
+            for r in range(r0, r1 + 1):
+                row = rows.get(r, {})
+                g = row.get(col_group) if col_group else None
+                if g and not single:
+                    cur = g
+                first, last = row.get(col_first, ''), row.get(col_last, '')
+                if not first:
+                    continue
+                if cur is None:
+                    continue
+                n = names_of(f'{first} {last}'.strip())
+                if n:
+                    groups.setdefault(cur, []).append(n)
+            group_sets.append(dict(name=name, kind=kind, group_label=label, groups=[dict(name=k, members=v) for k, v in groups.items()]))
+
+        region('Team Presentation Groups', 'group', 'Team', 'A', 'B', 'C', 3, 21)
+        region("Fall Children's Learning Center", 'group', 'Age group', 'E', 'G', 'H', 3, 21)
+        region("Guys' Life Skills & Friday Night Group", 'group', 'Group', 'A', 'C', 'D', 25, 40)
+        region("Girls' Friday Night Group", 'group', 'Group', None, 'E', 'F', 25, 40, single='Girls')
+        pairs = {}
+        for r in range(24, 40):
+            row = rows.get(r, {})
+            if row.get('H') and (row.get('I') or row.get('J')):
+                mem = [names_of(row[c]) for c in ('I', 'J', 'K', 'L') if row.get(c)]
+                pairs[row['H']] = [m for m in mem if m]
+        group_sets.append(dict(name='Accountability Partners', kind='partners', group_label='Pair', groups=[dict(name=k, members=v) for k, v in pairs.items()]))
+
     out_students = []
     for k in order:
         st = students[k]
@@ -297,10 +343,10 @@ def main(xlsx, out):
             st.pop(drop, None)
         out_students.append(st)
 
-    data = dict(students=out_students, host_homes=list(homes.values()), mentors=list(mentors.values()))
+    data = dict(students=out_students, host_homes=list(homes.values()), mentors=list(mentors.values()), group_sets=group_sets)
     with open(out, 'w') as fh:
         json.dump(data, fh, indent=2)
-    print(f'Wrote {out}: {len(out_students)} students, {len(homes)} host homes, {len(mentors)} mentors')
+    print(f'Wrote {out}: {len(out_students)} students, {len(homes)} host homes, {len(mentors)} mentors, {len(group_sets)} group sets')
     for w in warnings:
         print('WARNING:', w)
 

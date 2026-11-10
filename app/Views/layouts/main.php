@@ -44,6 +44,7 @@
         ['tuition', 'Tuition', 'cash-coin', 'tuition'],
         ['housing', 'Host Homes', 'house-heart', 'housing'],
         ['mentors', 'Mentors', 'person-check', 'mentors'],
+        ['groups', 'Groups', 'diagram-3', 'groups'],
         ['transcripts', 'Transcripts', 'file-earmark-text', 'transcripts'],
       ];
       $path = trim(uri_string(), '/');

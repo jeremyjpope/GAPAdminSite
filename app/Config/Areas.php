@@ -15,6 +15,7 @@ class Areas extends BaseConfig
         'tuition'     => ['name' => 'Tuition',       'desc' => 'Payment plans, record payments and see balances.'],
         'housing'     => ['name' => 'Host Homes',    'desc' => 'Host home families and assignments.'],
         'mentors'     => ['name' => 'Mentors',       'desc' => 'Mentor list and assignments.'],
+        'groups'      => ['name' => 'Groups',        'desc' => 'Team, Friday night, life skills and accountability groupings.'],
         'transcripts' => ['name' => 'Transcripts',   'desc' => 'Course catalog, grades and transcript PDFs.'],
         'applicants'  => ['name' => 'Applicants',    'desc' => 'Admissions pipeline and interview scores (future).'],
         'admin'       => ['name' => 'Site Admin',    'desc' => 'Manage who can log in, program years and settings.'],

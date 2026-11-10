@@ -55,6 +55,17 @@ $routes->group('mentors', ['filter' => 'area:mentors'], static function ($r) {
     $r->post('assign', 'Mentors::assign');
 });
 
+$routes->group('groups', ['filter' => 'area:groups'], static function ($r) {
+    $r->get('/', 'Groups::index');
+    $r->post('sets', 'Groups::saveSet');
+    $r->post('sets/(:num)/delete', 'Groups::deleteSet/$1');
+    $r->get('sets/(:num)', 'Groups::set/$1');
+    $r->post('sets/(:num)/groups', 'Groups::saveGroup/$1');
+    $r->post('sets/(:num)/groups/(:num)/delete', 'Groups::deleteGroup/$1/$2');
+    $r->post('sets/(:num)/assign', 'Groups::assign/$1');
+    $r->get('sets/(:num)/print', 'Groups::printSet/$1');
+});
+
 $routes->group('transcripts', ['filter' => 'area:transcripts'], static function ($r) {
     $r->get('/', 'Transcripts::index');
     $r->get('catalog', 'Transcripts::catalog');

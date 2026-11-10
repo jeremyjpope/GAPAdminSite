@@ -2,6 +2,9 @@
 
 namespace App\Commands;
 
+use App\Models\GroupMemberModel;
+use App\Models\GroupModel;
+use App\Models\GroupSetModel;
 use App\Models\HostHomeModel;
 use App\Models\MentorModel;
 use App\Models\PaymentModel;
@@ -152,5 +155,50 @@ class ImportYear extends BaseCommand
             }
         }
         CLI::write("Students: {$created} created, {$updated} updated. Payments added: {$payments}", 'green');
+
+        // Group sets: matched by name within the year; membership is replaced from the file.
+        $gsm = new GroupSetModel();
+        $gm  = new GroupModel();
+        $mm  = new GroupMemberModel();
+        $byName = [];
+        foreach ($sm->where('program_year_id', $yid)->findAll() as $st) {
+            $byName[strtolower($st['first_name'] . ' ' . $st['last_name'])] = $st['id'];
+        }
+        $sort = 0;
+        foreach ($data['group_sets'] ?? [] as $gs) {
+            $sort += 10;
+            $set = $gsm->where('program_year_id', $yid)->where('name', $gs['name'])->first();
+            $sf  = ['program_year_id' => $yid, 'name' => $gs['name'], 'kind' => $gs['kind'] ?? 'group', 'group_label' => $gs['group_label'] ?? 'Group', 'sort_order' => $sort];
+            if ($set) {
+                $gsm->update($set['id'], $sf);
+                $setId = $set['id'];
+            } else {
+                $gsm->insert($sf);
+                $setId = $gsm->getInsertID();
+            }
+            $n = 0;
+            foreach ($gs['groups'] ?? [] as $i => $g) {
+                $row = $gm->where('group_set_id', $setId)->where('name', $g['name'])->first();
+                $gf  = ['group_set_id' => $setId, 'name' => $g['name'], 'sort_order' => ($i + 1) * 10];
+                if ($row) {
+                    $gm->update($row['id'], $gf);
+                    $gid = $row['id'];
+                } else {
+                    $gm->insert($gf);
+                    $gid = $gm->getInsertID();
+                }
+                $mm->where('group_id', $gid)->delete();
+                foreach ($g['members'] ?? [] as $name) {
+                    $sid = $byName[strtolower($name)] ?? null;
+                    if ($sid) {
+                        $mm->insert(['group_id' => $gid, 'student_id' => $sid]);
+                        $n++;
+                    } else {
+                        CLI::write("  unmatched member '{$name}' in {$gs['name']} / {$g['name']}", 'yellow');
+                    }
+                }
+            }
+            CLI::write("Group set '{$gs['name']}': " . count($gs['groups'] ?? []) . " groups, {$n} members");
+        }
     }
 }
