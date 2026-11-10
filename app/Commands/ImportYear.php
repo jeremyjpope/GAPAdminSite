@@ -155,6 +155,10 @@ class ImportYear extends BaseCommand
                 'host_home_id' => $s['host_home'] ? ($homeIds[$s['host_home']] ?? null) : null,
                 'mentor_id'    => $s['mentor'] ? ($mentorIds[$s['mentor']] ?? null) : null,
             ];
+            if (! empty($year['end_date']) && $year['end_date'] < date('Y-m-d')) {
+                $f['attended_from'] = 'August ' . substr($year['start_date'], 0, 4);
+                $f['attended_to']   = 'May ' . substr($year['end_date'], 0, 4);
+            }
             if ($row) {
                 $f = array_filter($f, fn ($v) => $v !== null) + ['host_home_id' => $f['host_home_id'], 'mentor_id' => $f['mentor_id']];
                 $sm->update($row['id'], $f);
@@ -182,7 +186,7 @@ class ImportYear extends BaseCommand
                 $tf   = ['student_id' => $sid, 'plan_type' => $t['plan_type'], 'total_due' => $t['total_due'], 'notes' => $t['notes'] ?: null];
                 $acct ? $tm->update($acct['id'], $tf) : $tm->insert($tf);
                 foreach ($t['payments'] ?? [] as $p) {
-                    $dup = $pm->where('student_id', $sid)->where('paid_on', $p['paid_on'])->where('amount', $p['amount'])->first();
+                    $dup = $pm->where('student_id', $sid)->where('paid_on', $p['paid_on'])->where('amount', $p['amount'])->where('note', $p['note'] ?: null)->first();
                     if (! $dup) {
                         $pm->insert(['student_id' => $sid, 'paid_on' => $p['paid_on'], 'amount' => $p['amount'], 'method' => $p['method'] ?: null, 'reference' => $p['reference'] ?: null, 'note' => $p['note'] ?: null]);
                         $payments++;
