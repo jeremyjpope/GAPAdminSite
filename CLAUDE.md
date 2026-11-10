@@ -47,8 +47,14 @@ scores, the Excel file, import JSON, photos, SQLite db) out of git.
 - Local DB is SQLite at `writable/gapadmin.db` (ignored). `php spark migrate`, `php spark db:seed InitialSeeder`.
 - `/dev-login` logs in as the first super admin without Moodle (development environment only).
   Note the built-in server caches env vars: after editing `.env`, restart `spark serve`.
-- Re-import the Excel data with `tools/excel_to_json.py` + `php spark gap:import` (see README).
-  The import is idempotent but re-applies sheet values to students and replaces group membership.
+- Re-import the Excel data with `tools/excel_to_json.py` + `php spark gap:import` (see README);
+  `php spark gap:year` creates a missing program year. The import is idempotent but re-applies sheet
+  values to students and replaces group membership; a payment is a duplicate only when date, amount
+  AND note match, so re-importing after the parser's note wording changed will double payments
+  (happened once for 2026-27; dedupe on student+date+amount keeping the lowest id).
+- All eight years 2019-20..2026-27 are imported on the live site (Nov 2026). The workbooks live in
+  OneDrive "GAP Team - Documents/Yearly Databases/<year>/". Each year's layout differs; the parser is
+  header/title driven and has a regression check: Years 6-8 output must not change when touching it.
 - Verify pages by logging in via `/dev-login` and reading them; PDFs can be fetched with curl
   using the session cookie from `/dev-login`.
 

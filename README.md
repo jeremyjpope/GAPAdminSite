@@ -56,19 +56,30 @@ The default local `.env` uses SQLite (`writable/gapadmin.db`), so no MySQL is ne
 In the **development** environment the login page shows a *Dev shortcut* that logs you in as the
 first super admin without contacting Moodle. It returns 404 in production.
 
-### Importing the yearly Excel database
+### Importing a yearly Excel database
 
 ```bash
 pip3 install openpyxl
-python3 tools/excel_to_json.py "/path/to/2026-27 Year 8 Database.xlsx" writable/import/year8.json
-php spark gap:import writable/import/year8.json          # --year 2026-27 to target another year
+php spark gap:year 2024-25 --number 6 --early 3500       # only if the program year does not exist yet
+python3 tools/excel_to_json.py "/path/to/2024-25 Year 6 Database.xlsx" writable/import/year6.json 2024-25
+php spark gap:import writable/import/year6.json --year 2024-25
 ```
 
-The script reads the *Student Names & Email Addresses*, *Applicants*, *Student Auto Information*,
-*Mentor Information*, *Host Home Assignments*, *Tuition Info*, *Groups Teams*, *Volunteer List*,
-*GAP 360 for Women Invitees* (background check / SAAT only, for people already on the volunteer list)
-and *Volunteer Teams* (life-skills leads) sheets. Volunteers are matched by email, then by name, and the
-import only fills blank fields on an existing volunteer. It prints warnings for
+The third argument to the script is the program-year label; it decides which calendar years undated
+payments and "Fall"/"Spring" belong to. All eight workbooks from 2019-20 to 2026-27 have been imported;
+the parser reads columns by header name and finds sections by title, so it copes with the layout
+changing from year to year (roster tabs, Guys/Girls applicant tabs, group matrices, housing sheets
+with one host per row, tuition written as free text or running totals). Review its WARNING lines:
+they name every fuzzy name match, assumed tuition total and ledger that exceeds its total.
+
+Sheets it understands (any may be missing): a roster tab (*Student Names & Email Addresses*, a
+*… Groups* tab, *2019 Students*, *GAP Guy Directory*), applicant tabs (*Applicants*, *Guys*/*Girls*,
+*2023-24 GUY*…), *Student Auto Information*, *Tuition Info*, *Host Home Assignments* / *Host Home* /
+*Host Homes* / *Host Home Information*, *Mentor Information* (either layout), *Groups Teams* /
+*GroupsTeams*, *Volunteer List* / *GAP Volunteer List* / *GAP Master Volunteer List*, *GAP 360 for Women
+Invitees* (compliance fields for people already on the list) and *Volunteer Teams* (life-skills leads).
+Volunteers are matched by email, then by name, across years; the import only fills blank fields on an
+existing volunteer, so one person hosting in 2019 and mentoring in 2026 is a single record. It prints warnings for
 anything it could not interpret (for example a monthly plan marked PAID with no amounts in the
 month grid). Payment cells like `ck #1094 $400/parents' acct; dated 9/15/26` become ledger rows
 with the check number and date; the full cell text is kept in the note. The import is idempotent:
