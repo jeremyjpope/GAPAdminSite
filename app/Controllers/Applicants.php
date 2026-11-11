@@ -316,10 +316,10 @@ class Applicants extends BaseController
             }
         }
         $names = array_filter($keys, static fn ($k) => str_starts_with($k, 'n:'));
-        sort($names);
         foreach ($names as $k) {
             $out[$k] = ['fullname' => substr($k, 2)];
         }
+        uasort($out, static fn ($a, $b) => strcasecmp($a['fullname'], $b['fullname']));
 
         return $out;
     }
