@@ -284,26 +284,41 @@ class Applicants extends BaseController
         return $a;
     }
 
-    /** Scorer key: the site user id, or "n:<name>" for scores imported from the sheet. */
+    private ?array $userByFirst = null;
+
+    /** Scorer key: the site user id; an imported score keyed by first name joins the site user with that first name when there is exactly one. */
     private function scorerKey(array $s): string
     {
-        return $s['user_id'] ? (string) $s['user_id'] : 'n:' . $s['scorer_name'];
+        if ($s['user_id']) {
+            return (string) $s['user_id'];
+        }
+        if ($this->userByFirst === null) {
+            $this->userByFirst = [];
+            foreach ((new UserModel())->findAll() as $u) {
+                $f = strtolower(trim(explode(' ', trim($u['fullname']))[0]));
+                $this->userByFirst[$f] = isset($this->userByFirst[$f]) ? false : $u;   // false = ambiguous
+            }
+        }
+        $u = $this->userByFirst[strtolower(trim((string) $s['scorer_name']))] ?? null;
+
+        return $u ? (string) $u['id'] : 'n:' . $s['scorer_name'];
     }
 
     /** Scorers present in a set of scores: key => ['fullname' => …], site users first then imported names. */
     private function scorers(array $scores): array
     {
         $out = [];
-        $ids = array_values(array_unique(array_filter(array_column($scores, 'user_id'))));
+        $keys = array_unique(array_map(fn ($s) => $this->scorerKey($s), $scores));
+        $ids  = array_values(array_filter($keys, static fn ($k) => ! str_starts_with($k, 'n:')));
         if ($ids) {
             foreach ((new UserModel())->whereIn('id', $ids)->orderBy('fullname')->findAll() as $u) {
                 $out[(string) $u['id']] = $u;
             }
         }
-        $names = array_unique(array_filter(array_map(static fn ($s) => $s['user_id'] ? null : $s['scorer_name'], $scores)));
+        $names = array_filter($keys, static fn ($k) => str_starts_with($k, 'n:'));
         sort($names);
-        foreach ($names as $n) {
-            $out['n:' . $n] = ['fullname' => $n];
+        foreach ($names as $k) {
+            $out[$k] = ['fullname' => substr($k, 2)];
         }
 
         return $out;

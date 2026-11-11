@@ -53,7 +53,7 @@
    </form></div>
  </div>
  <div class="col-lg-5">
-  <div class="card mb-3" id="rubric"><div class="card-header bg-white fw-semibold d-flex justify-content-between"><span>Interview rubric</span><?php if ($avg): ?><span class="badge text-bg-dark fs-6"><?= number_format($avg['total'], 2) ?></span><?php endif ?></div>
+  <div class="card mb-3" id="rubric"><div class="card-header bg-white fw-semibold d-flex justify-content-between align-items-center"><span>Interview rubric <a class="small fw-normal ms-1" href="<?= site_url('applicants/rubric') ?>">everyone's scores, all applicants</a></span><?php if ($avg): ?><span class="badge text-bg-dark fs-6"><?= number_format($avg['total'], 2) ?></span><?php endif ?></div>
    <form class="card-body py-2" method="post" action="<?= site_url('applicants/' . $a['id'] . '/scores') ?>"><?= csrf_field() ?>
     <div class="small text-secondary mb-2">Your scores, 1–10. Leave a box empty to skip it; empty scores are not averaged.</div>
     <div class="row g-2">

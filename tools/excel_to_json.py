@@ -82,7 +82,8 @@ def find_sheet(wb, *patterns, exclude=r'copy of'):
     return None
 
 
-ROLE_ALIASES = {'leadership': 'Leadership Team/Advisory', 'leadership team': 'Leadership Team/Advisory',
+ROLE_ALIASES = {'leadership': 'Leadership Team', 'leadership team': 'Leadership Team', 'leadership team/advisory': 'Leadership Team',
+                'advisory': 'Advisory Team', 'advisory team': 'Advisory Team',
                 'mentor': 'Guys Mentor', 'host home': 'Host Family', 'host': 'Host Family', 'sub host family': 'Sub Host Family',
                 'career': 'Career Moment', 'special topics': 'Special Topic', 'meal': 'Meal Provider'}
 

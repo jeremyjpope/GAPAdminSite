@@ -10,7 +10,7 @@ class Volunteers extends BaseConfig
     public array $roles = [
         'Host Family', 'Sub Host Family', 'Host Home Sponsor', 'Guys Mentor', 'Girls Mentor',
         'Life Skills', 'Fitness', 'Career Moment', 'Special Topic', 'Instructor',
-        'Leadership Team/Advisory', 'Meal Provider', 'Potential Volunteer', 'Guest',
+        'Leadership Team', 'Advisory Team', 'Meal Provider', 'Potential Volunteer', 'Guest',
     ];
 
     /** Roles that make someone show up as a mentor option. */

@@ -47,6 +47,7 @@
         ['groups', 'Groups', 'diagram-3', 'groups'],
         ['volunteers', 'Volunteers', 'people-fill', 'volunteers'],
         ['applicants', 'Applicants', 'person-plus', 'applicants'],
+        ['applicants/rubric', 'Interview rubric', 'clipboard-data', 'applicants'],
         ['schedule', 'Schedule', 'calendar-week', 'schedule'],
         ['courses', 'Courses', 'journal-bookmark', 'schedule'],
         ['transcripts', 'Transcripts', 'file-earmark-text', 'transcripts'],
@@ -54,8 +55,9 @@
       $path = trim(uri_string(), '/');
     ?>
     <ul class="nav flex-column gap-1">
-      <?php foreach ($nav as [$href, $label, $icon, $area]): if ($area && ! Auth::can($area)) continue;
-        $active = $href === '/' ? $path === '' : str_starts_with($path, $href); ?>
+      <?php $best = ''; foreach ($nav as [$h]) { if ($h !== '/' && str_starts_with($path, $h) && strlen($h) > strlen($best)) { $best = $h; } }
+      foreach ($nav as [$href, $label, $icon, $area]): if ($area && ! Auth::can($area)) continue;
+        $active = $href === '/' ? $path === '' : $href === $best; ?>
       <li class="nav-item"><a class="nav-link <?= $active ? 'active' : '' ?>" href="<?= site_url($href) ?>"><i class="bi bi-<?= $icon ?> me-2"></i><?= $label ?></a></li>
       <?php endforeach ?>
       <?php if (Auth::can('admin')): ?>
