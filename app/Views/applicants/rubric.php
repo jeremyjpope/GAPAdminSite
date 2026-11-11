@@ -9,7 +9,7 @@
  @media print { .sidebar, .navbar { display:none !important } .rb { font-size:.6rem } }
 </style>
 <?php $cats = $cfg->rubric; $n = count($scorers); ?>
-<?php if ($rows && ! $n): ?><div class="alert alert-warning">No interview scores have been entered for <?= esc($year['label'] ?? '') ?> yet. The year is chosen in the sidebar; scores are entered on each applicant's page.</div><?php endif ?>
+<?php $any = array_filter($avg); if ($rows && ! $any): ?><div class="alert alert-light border">No scores entered for <?= esc($year['label'] ?? '') ?> yet. Each team member enters their own scores on the applicant's page; the columns fill in here.</div><?php endif ?>
 <?php foreach (['M' => 'Guy applicants', 'F' => 'Girl applicants'] as $g => $title): $list = array_filter($rows, fn ($r) => $r['gender'] === $g); if (! $list) continue; ?>
 <div class="card mb-3"><div class="card-header bg-white fw-semibold"><?= $title ?></div>
 <div class="table-responsive"><table class="table table-bordered rb mb-0">

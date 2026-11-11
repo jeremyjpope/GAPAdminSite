@@ -304,11 +304,21 @@ class Applicants extends BaseController
         return $u ? (string) $u['id'] : 'n:' . $s['scorer_name'];
     }
 
-    /** Scorers present in a set of scores: key => ['fullname' => …], site users first then imported names. */
+    /**
+     * Rubric columns: every active site user who can score (has the Applicants area, or is a super admin),
+     * plus anyone who has already scored (including names imported from the sheet). Alphabetical by first name.
+     */
     private function scorers(array $scores): array
     {
         $out = [];
         $keys = array_unique(array_map(fn ($s) => $this->scorerKey($s), $scores));
+        $eligible = array_column((new UserAreaModel())->where('area', 'applicants')->findAll(), 'user_id');
+        foreach ((new UserModel())->where('is_active', 1)->findAll() as $u) {
+            if ($u['is_superadmin'] || in_array($u['id'], $eligible, false)) {
+                $keys[] = (string) $u['id'];
+            }
+        }
+        $keys = array_unique($keys);
         $ids  = array_values(array_filter($keys, static fn ($k) => ! str_starts_with($k, 'n:')));
         if ($ids) {
             foreach ((new UserModel())->whereIn('id', $ids)->orderBy('fullname')->findAll() as $u) {
